@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Count8 Content Advisor</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="/shared/nav.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="site-sidebar">
+    <div class="sidebar-top-row">
+      <div class="sidebar-brand">
+        <span class="brand-mark">◐</span>
+        <span class="brand-name">Count8</span>
+      </div>
+      <div id="langSwitchMount"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-link"><span class="nav-icon">🎥</span><span data-i18n="nav_learning">Learning Mode</span></a>
+      <a href="/practice-journal/" class="nav-link"><span class="nav-icon">📓</span><span data-i18n="nav_journal">Practice Journal</span></a>
+      <a href="/content-advisor/" class="nav-link active"><span class="nav-icon">🎬</span><span data-i18n="nav_advisor">Content Advisor</span></a>
+    </nav>
+  </aside>
+
+  <div class="page-column">
+  <main>
+
+  <section class="intro">
+    <h1 data-i18n="advisor_heading">Social Media Performance Advisor</h1>
+    <p data-i18n="advisor_intro">Upload a reference dance video you want to recreate for social media. Count8 will analyze its filming style and suggest how to shoot your own version for TikTok, Instagram Reels, or Xiaohongshu.</p>
+  </section>
+
+  <!-- Upload -->
+  <section id="uploadSection" class="card upload-card">
+    <div class="project-picker-row">
+      <label for="projectPicker" data-i18n="advisor_project_label">Save results to project</label>
+      <select id="projectPicker">
+        <option value="" data-i18n="advisor_project_none">Don't save (standalone)</option>
+      </select>
+    </div>
+    <button id="chooseFileBtn" class="btn btn-primary" data-i18n="advisor_upload_btn">Upload Reference Video</button>
+    <input id="fileInput" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" hidden />
+    <p id="uploadError" class="error-text hidden"></p>
+  </section>
+
+  <!-- Reference video preview -->
+  <section id="videoPreviewSection" class="card video-preview-card hidden">
+    <span class="pane-label" data-i18n="advisor_pane_label">Reference Video</span>
+    <video id="referenceVideo" playsinline controls></video>
+  </section>
+
+  <!-- Analysis status -->
+  <div id="advisorStatus" class="gen-status hidden">
+    <div class="spinner"></div>
+    <span id="advisorStatusText" data-i18n="advisor_status_analyzing">Analyzing filming style…</span>
+  </div>
+
+  <!-- Results -->
+  <section id="advisorResults" class="advisor-results hidden">
+    <h2 class="section-title" data-i18n="advisor_results_title">Filming & Styling Suggestions</h2>
+    <p id="advisorSavedNote" class="advisor-saved-note hidden"></p>
+    <div id="advisorCards" class="advisor-cards"></div>
+  </section>
+
+  </main>
+  </div>
+</div>
+
+<script src="/shared/i18n.js"></script>
+<script src="/shared/db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

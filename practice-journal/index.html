@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Count8 Practice Journal</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="/shared/nav.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="site-sidebar">
+    <div class="sidebar-top-row">
+      <div class="sidebar-brand">
+        <span class="brand-mark">◐</span>
+        <span class="brand-name">Count8</span>
+      </div>
+      <div id="langSwitchMount"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-link"><span class="nav-icon">🎥</span><span data-i18n="nav_learning">Learning Mode</span></a>
+      <a href="/practice-journal/" class="nav-link active"><span class="nav-icon">📓</span><span data-i18n="nav_journal">Practice Journal</span></a>
+      <a href="/content-advisor/" class="nav-link"><span class="nav-icon">🎬</span><span data-i18n="nav_advisor">Content Advisor</span></a>
+    </nav>
+  </aside>
+
+  <div class="page-column">
+  <main>
+
+  <!-- Sub-navigation: categorizes the journal into Projects / Plan / Growth -->
+  <nav class="subnav" id="journalSubnav" role="tablist">
+    <button type="button" class="subnav-btn active" data-tab="projects" role="tab" aria-selected="true">
+      <span class="subnav-icon">📁</span><span data-i18n="tab_my_projects">My Projects</span>
+    </button>
+    <button type="button" class="subnav-btn" data-tab="plan" role="tab" aria-selected="false">
+      <span class="subnav-icon">🗓️</span><span data-i18n="tab_my_plan">My Plan</span>
+    </button>
+    <button type="button" class="subnav-btn" data-tab="growth" role="tab" aria-selected="false">
+      <span class="subnav-icon">📈</span><span data-i18n="tab_my_growth">My Growth</span>
+    </button>
+  </nav>
+
+  <!-- My Projects -->
+  <section class="tab-panel" id="panelProjects" data-panel="projects">
+    <section class="card growth-journal-section">
+      <h2 class="section-title" data-i18n="growth_projects_title">Your Choreography Projects</h2>
+      <p id="projectsEmptyState" class="hint-text hidden" data-i18n="growth_empty">Create a project in Learning Mode and upload a practice video to start seeing your growth here.</p>
+      <div id="growthProjectsList" class="projects-list"></div>
+    </section>
+  </section>
+
+  <!-- My Plan -->
+  <section class="tab-panel hidden" id="panelPlan" data-panel="plan">
+    <section class="card plan-form-section">
+      <h2 class="section-title" data-i18n="plan_add_title">Add to Your Plan</h2>
+      <form id="planForm" novalidate>
+        <div class="field-grid">
+          <div class="field">
+            <label for="planDate" data-i18n="journal_date_label">Date</label>
+            <input type="date" id="planDate" required />
+          </div>
+          <div class="field">
+            <label for="planTime" data-i18n="plan_time_label">Time</label>
+            <input type="time" id="planTime" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="planText" data-i18n="plan_text_label">What will you work on?</label>
+          <input type="text" id="planText" placeholder="e.g. Practice waacking arms for 30 min" required data-i18n-placeholder="plan_text_placeholder" />
+        </div>
+        <button type="submit" class="btn btn-primary" data-i18n="plan_add_btn">Add to Plan</button>
+      </form>
+    </section>
+
+    <section class="card plan-week-section">
+      <h2 class="section-title" data-i18n="plan_week_title">Next 7 Days</h2>
+      <div id="planWeekContainer" class="plan-week-container"></div>
+    </section>
+  </section>
+
+  <!-- My Growth -->
+  <section class="tab-panel hidden" id="panelGrowth" data-panel="growth">
+    <section class="card growth-journal-section" id="growthJournalSection">
+      <h2 class="section-title" data-i18n="growth_title">Growth Journal</h2>
+      <p id="growthEmptyState" class="hint-text hidden" data-i18n="growth_empty">Create a project in Learning Mode and upload a practice video to start seeing your growth here.</p>
+
+      <div id="growthStatsGrid" class="growth-stats-grid hidden">
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statFrequency">0</span>
+          <span class="growth-stat-label" data-i18n="growth_stat_frequency">Practice Sessions</span>
+        </div>
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statChoreographies">0</span>
+          <span class="growth-stat-label" data-i18n="growth_stat_choreographies">Choreographies</span>
+        </div>
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statFoundations">0</span>
+          <span class="growth-stat-label" data-i18n="growth_stat_foundations">Foundations Learned</span>
+        </div>
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statAccuracy">—</span>
+          <span class="growth-stat-label" data-i18n="score_accuracy">Accuracy</span>
+        </div>
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statTiming">—</span>
+          <span class="growth-stat-label" data-i18n="score_timing">Timing</span>
+        </div>
+        <div class="growth-stat-tile">
+          <span class="growth-stat-value" id="statStability">—</span>
+          <span class="growth-stat-label" data-i18n="score_stability">Stability</span>
+        </div>
+      </div>
+
+      <div id="growthTrendWrap" class="growth-trend-wrap hidden">
+        <div class="growth-trend-header">
+          <h3 class="growth-subtitle" data-i18n="growth_trend_title">Score Trends Over Time</h3>
+          <select id="trendRangeSelect" class="trend-range-select">
+            <option value="7" data-i18n="trend_range_7">1 Week</option>
+            <option value="14" data-i18n="trend_range_14">2 Weeks</option>
+            <option value="30" selected data-i18n="trend_range_30">1 Month</option>
+            <option value="180" data-i18n="trend_range_180">6 Months</option>
+            <option value="365" data-i18n="trend_range_365">1 Year</option>
+          </select>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="growthTrendChart"></canvas>
+        </div>
+      </div>
+
+      <div id="growthFoundationsWrap" class="growth-foundations-wrap hidden">
+        <h3 class="growth-subtitle" data-i18n="growth_foundations_title">Mastered Foundations</h3>
+        <div id="growthFoundationsList" class="growth-foundations-list"></div>
+      </div>
+    </section>
+
+    <!-- Log a session -->
+    <section class="card log-section">
+      <h2 class="section-title" data-i18n="journal_log_title">Log a Practice Session</h2>
+      <form id="logForm" novalidate>
+        <div class="field-grid">
+          <div class="field">
+            <label for="sessionDate" data-i18n="journal_date_label">Date</label>
+            <input type="date" id="sessionDate" required />
+          </div>
+          <div class="field">
+            <label for="technique" data-i18n="journal_technique_label">Technique</label>
+            <input type="text" id="technique" list="techniqueList" placeholder="e.g. Chest Isolations" required data-i18n-placeholder="journal_technique_placeholder" />
+            <datalist id="techniqueList"></datalist>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="videoRef" data-i18n="journal_video_label">Video (file name or YouTube link)</label>
+          <input type="text" id="videoRef" placeholder="e.g. practice_take3.mp4 or a YouTube URL" data-i18n-placeholder="journal_video_placeholder" />
+        </div>
+
+        <div class="field">
+          <label data-i18n="journal_rating_label">Self-Rating</label>
+          <div id="starPicker" class="star-picker" role="radiogroup" aria-label="Self rating out of 5"></div>
+          <p id="ratingError" class="field-error hidden" data-i18n="journal_rating_error">Please select a rating.</p>
+        </div>
+
+        <div class="field">
+          <label for="notes" data-i18n="journal_notes_label">Notes</label>
+          <textarea id="notes" rows="3" placeholder="What felt good? What needs work?" data-i18n-placeholder="journal_notes_placeholder"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" data-i18n="journal_log_btn">Log Session</button>
+      </form>
+    </section>
+
+    <!-- What to work on next -->
+    <section class="card next-up-section" id="nextUpSection">
+      <h2 class="section-title" data-i18n="journal_next_up_title">What to Work On Next</h2>
+      <div id="nextUpContent" class="next-up-content"></div>
+    </section>
+
+    <!-- Progress charts -->
+    <section class="card charts-section" id="chartsSection">
+      <h2 class="section-title" data-i18n="journal_charts_title">Progress Over Time</h2>
+      <div id="chartsContainer" class="charts-container"></div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="card timeline-section" id="timelineSection">
+      <h2 class="section-title" data-i18n="journal_timeline_title">Practice Timeline</h2>
+      <div id="timelineContainer" class="timeline-container"></div>
+    </section>
+  </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p id="affirmation" class="affirmation"></p>
+  </footer>
+  </div>
+</div>
+
+<!-- Project detail modal -->
+<div id="projectDetailModal" class="modal-overlay hidden">
+  <div class="modal project-detail-modal">
+    <div class="modal-header-row">
+      <h2 id="projectDetailName"></h2>
+      <button id="closeProjectDetailBtn" class="btn btn-ghost" data-i18n="bpm_close">Close</button>
+    </div>
+    <div id="projectDetailContent" class="project-detail-content"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="/shared/i18n.js"></script>
+<script src="/shared/db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

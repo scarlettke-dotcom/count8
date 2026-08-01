@@ -1,0 +1,13 @@
+{
+  "name": "count8",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Count8: Learning Mode, Technique Breakdown, and Practice Journal served as one site.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0"
+  }
+}

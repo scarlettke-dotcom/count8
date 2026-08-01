@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Count8</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="/shared/nav.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="site-sidebar">
+    <div class="sidebar-top-row">
+      <div class="sidebar-brand">
+        <span class="brand-mark">◐</span>
+        <span class="brand-name">Count8</span>
+      </div>
+      <div id="langSwitchMount"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-link active"><span class="nav-icon">🎥</span><span data-i18n="nav_learning">Learning Mode</span></a>
+      <a href="/practice-journal/" class="nav-link"><span class="nav-icon">📓</span><span data-i18n="nav_journal">Practice Journal</span></a>
+      <a href="/content-advisor/" class="nav-link"><span class="nav-icon">🎬</span><span data-i18n="nav_advisor">Content Advisor</span></a>
+    </nav>
+  </aside>
+
+  <div class="page-column">
+  <header class="page-header">
+    <button id="myProjectsBtn" class="btn btn-ghost hidden" data-i18n="nav_my_projects">My Projects</button>
+  </header>
+
+  <main>
+
+  <!-- Project list / picker -->
+  <section id="projectsScreen" class="upload-screen">
+    <div class="drop-zone projects-card">
+      <h1 data-i18n="projects_heading">Your Projects</h1>
+      <p data-i18n="projects_intro">Start a new project for a choreography you're learning, or reopen one to keep tracking your progress.</p>
+      <button id="newProjectBtn" class="btn btn-primary" data-i18n="projects_new_btn">+ New Project</button>
+
+      <div id="projectsList" class="projects-list"></div>
+      <p id="projectsEmpty" class="hint-text hidden" data-i18n="projects_empty">No projects yet — create one to get started.</p>
+    </div>
+  </section>
+
+  <!-- Upload Screen (scoped to the active project) -->
+  <section id="uploadScreen" class="upload-screen hidden">
+    <div id="dropZone" class="drop-zone">
+      <button id="backToProjectsBtn" class="btn btn-ghost back-link" data-i18n="back_to_projects">← My Projects</button>
+      <div class="drop-icon">⤒</div>
+      <h1 data-i18n="upload_heading">Upload a dance video</h1>
+      <p data-i18n-html="upload_desc_html">Drop an MP4 or MOV file here, or choose one from your device.<br/>
+         Count8 will generate a mirrored version automatically.</p>
+      <button id="chooseFileBtn" class="btn btn-primary" data-i18n="choose_video">Choose Video</button>
+      <input id="fileInput" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" hidden />
+      <p id="uploadError" class="error-text hidden"></p>
+    </div>
+  </section>
+
+  <!-- Workspace Screen -->
+  <section id="workspace" class="workspace hidden">
+    <div class="workspace-grid">
+
+      <div class="main-column">
+
+        <!-- Generation status -->
+        <div id="genStatus" class="gen-status hidden">
+          <div class="spinner"></div>
+          <span id="genStatusText" data-i18n="gen_status_generating">Generating mirrored video…</span>
+          <div class="gen-progress-track"><div id="genProgressBar" class="gen-progress-bar"></div></div>
+        </div>
+
+        <!-- View mode toggles -->
+        <div class="toolbar">
+          <div class="segmented" id="viewModeToggle" role="tablist" aria-label="View mode">
+            <button class="seg-btn active" data-view="single" data-i18n="toolbar_single">Single</button>
+            <button class="seg-btn" data-view="sidebyside" data-i18n="toolbar_sidebyside">Side-by-Side</button>
+          </div>
+
+          <div class="segmented" id="mirrorToggle" role="tablist" aria-label="Video variant">
+            <button class="seg-btn active" data-variant="original" data-i18n="toolbar_original">Original</button>
+            <button class="seg-btn" data-variant="mirrored" data-i18n="toolbar_mirrored">Mirrored</button>
+          </div>
+
+          <button id="setBpmBtn" class="btn btn-accent">
+            <span class="bpm-dot" id="bpmDotSmall"></span>
+            <span data-i18n="toolbar_set_bpm">Set BPM</span>
+          </button>
+        </div>
+
+        <!-- Video stage -->
+        <div id="videoStage" class="video-stage single-mode">
+
+          <div class="video-pane" id="paneOriginal" data-role="original">
+            <span class="pane-label" data-i18n="pane_original">Original</span>
+            <video id="videoOriginal" playsinline muted></video>
+          </div>
+
+          <div class="video-pane" id="paneMirrored" data-role="mirrored">
+            <span class="pane-label" data-i18n="pane_mirrored">Mirrored</span>
+            <video id="videoMirrored" playsinline muted></video>
+          </div>
+
+          <!-- Beat overlay -->
+          <div id="beatOverlay" class="beat-overlay hidden">
+            <div class="beat-count" id="beatCount">1</div>
+            <div class="beat-meta">
+              <span id="beatBpmLabel">— BPM</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Transport controls -->
+        <div class="transport">
+          <button id="playPauseBtn" class="btn btn-icon" aria-label="Play/Pause">▶</button>
+          <input id="seekBar" class="seek-bar" type="range" min="0" max="1000" value="0" step="1" />
+          <span id="timeLabel" class="time-label">0:00 / 0:00</span>
+        </div>
+
+        <!-- Speed controls -->
+        <div class="speed-section">
+          <h2 class="section-title" data-i18n="speed_title">Playback Speed</h2>
+          <div id="speedButtons" class="speed-grid"></div>
+        </div>
+
+      </div>
+
+      <!-- Foundational techniques found in this routine -->
+      <aside class="sidebar-column">
+        <h2 class="section-title" data-i18n="foundations_title">Foundational Techniques</h2>
+
+        <div id="foundationsStatus" class="gen-status hidden">
+          <div class="spinner"></div>
+          <span id="foundationsStatusText" data-i18n="foundations_status_identifying">Identifying foundational techniques…</span>
+        </div>
+
+        <section id="foundationsSection" class="foundations-section hidden">
+          <div id="foundationsCards" class="cards-container"></div>
+        </section>
+      </aside>
+
+    </div>
+
+    <!-- Practice feedback: compare a self-recorded attempt against this routine -->
+    <section class="card practice-feedback-section">
+      <h2 class="section-title" data-i18n="practice_feedback_title">Practice Feedback</h2>
+      <p class="practice-feedback-intro" data-i18n="practice_feedback_intro">Upload a video of yourself practicing this choreography to get personalized feedback on timing, posture, and technique.</p>
+
+      <div class="practice-upload-row">
+        <button id="choosePracticeFileBtn" class="btn btn-accent" data-i18n="practice_upload_btn">Upload Your Practice Video</button>
+        <input id="practiceFileInput" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" hidden />
+        <p id="practiceUploadError" class="error-text hidden"></p>
+      </div>
+
+      <div id="practiceCompareStage" class="practice-compare-stage hidden">
+        <div class="practice-video-pane">
+          <span class="pane-label" data-i18n="practice_pane_reference">Original Choreography</span>
+          <video id="referenceCompareVideo" playsinline muted controls></video>
+        </div>
+        <div class="practice-video-pane">
+          <span class="pane-label" data-i18n="practice_pane_practice">Your Practice</span>
+          <video id="practiceVideo" playsinline controls></video>
+        </div>
+      </div>
+
+      <div id="practiceFeedbackStatus" class="gen-status hidden">
+        <div class="spinner"></div>
+        <span id="practiceFeedbackStatusText" data-i18n="practice_status_analyzing">Analyzing your practice video…</span>
+      </div>
+
+      <section id="practiceFeedbackResults" class="foundations-section hidden">
+        <div id="practiceScoresRow" class="scores-row">
+          <div class="score-badge">
+            <span class="score-value" id="scoreAccuracy">—</span>
+            <span class="score-label" data-i18n="score_accuracy">Accuracy</span>
+          </div>
+          <div class="score-badge">
+            <span class="score-value" id="scoreTiming">—</span>
+            <span class="score-label" data-i18n="score_timing">Timing</span>
+          </div>
+          <div class="score-badge">
+            <span class="score-value" id="scoreStability">—</span>
+            <span class="score-label" data-i18n="score_stability">Stability</span>
+          </div>
+        </div>
+        <p id="practiceFeedbackSummary" class="practice-feedback-summary"></p>
+        <div id="practiceFeedbackCards" class="cards-container"></div>
+      </section>
+    </section>
+
+  </section>
+
+  </main>
+  </div>
+</div>
+
+<!-- New Project Modal -->
+<div id="newProjectModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 data-i18n="new_project_modal_title">Name Your Project</h2>
+    <div class="modal-section">
+      <label for="newProjectNameInput" data-i18n="new_project_name_label">Choreography name</label>
+      <input id="newProjectNameInput" type="text" placeholder="e.g. Butter Chorus" data-i18n-placeholder="new_project_name_placeholder" maxlength="80" />
+    </div>
+    <div class="modal-actions">
+      <button id="cancelNewProjectBtn" class="btn btn-ghost" data-i18n="bpm_close">Close</button>
+      <button id="createProjectBtn" class="btn btn-primary" data-i18n="new_project_create_btn">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- BPM Modal -->
+<div id="bpmModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 data-i18n="bpm_modal_title">Set BPM</h2>
+
+    <div class="modal-section">
+      <label for="bpmInput" data-i18n="bpm_manual_label">Manual entry</label>
+      <div class="bpm-input-row">
+        <input id="bpmInput" type="number" min="20" max="300" step="1" placeholder="e.g. 120" data-i18n-placeholder="bpm_input_placeholder" />
+        <button id="applyBpmBtn" class="btn btn-primary" data-i18n="bpm_apply">Apply</button>
+      </div>
+    </div>
+
+    <div class="modal-divider" data-i18n="bpm_or">or</div>
+
+    <div class="modal-section">
+      <label data-i18n="bpm_tap_label">Tap tempo</label>
+      <button id="tapTempoBtn" class="btn btn-accent btn-tap" data-i18n="bpm_tap_btn">TAP</button>
+      <p class="tap-readout"><span data-i18n="bpm_detected">Detected:</span> <span id="tapBpmReadout">—</span> <span data-i18n="bpm_unit">BPM</span></p>
+      <button id="useTapBpmBtn" class="btn btn-secondary" disabled data-i18n="bpm_use_this">Use this BPM</button>
+    </div>
+
+    <div class="modal-divider"></div>
+
+    <div class="modal-section">
+      <button id="alignBeatBtn" class="btn btn-ghost" data-i18n="bpm_align">Align beat 1 to current video time</button>
+      <p class="hint-text" data-i18n="bpm_align_hint">Pause the video on a downbeat, then tap this to sync counting.</p>
+    </div>
+
+    <div class="modal-actions">
+      <button id="closeBpmModalBtn" class="btn btn-ghost" data-i18n="bpm_close">Close</button>
+      <button id="clearBpmBtn" class="btn btn-ghost" data-i18n="bpm_turn_off">Turn off beat overlay</button>
+    </div>
+  </div>
+</div>
+
+<script src="/shared/i18n.js"></script>
+<script src="/shared/db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
