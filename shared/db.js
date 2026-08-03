@@ -57,6 +57,7 @@
       foundations: null,       // [{ name, explanation, drill, youtube_queries }]
       practiceEntries: [],     // [{ id, timestamp, video: {blob,name,type}, feedback: {...} }]
       contentAdvisor: null,    // { timestamp, suggestions: {...8 fields} }
+      bookmarks: [],           // [{ id, time }] — user-set points on the original video's timeline
     };
   }
 

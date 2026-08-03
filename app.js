@@ -62,8 +62,11 @@
   const beatBpmLabel  = document.getElementById('beatBpmLabel');
 
   const playPauseBtn  = document.getElementById('playPauseBtn');
+  const seekBarWrap   = document.getElementById('seekBarWrap');
   const seekBar       = document.getElementById('seekBar');
+  const seekBookmarksEl = document.getElementById('seekBookmarks');
   const timeLabel     = document.getElementById('timeLabel');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
   const speedButtons  = document.getElementById('speedButtons');
 
   const bpmModal        = document.getElementById('bpmModal');
@@ -92,6 +95,7 @@
   let variant = 'original';    // 'original' | 'mirrored' (single mode only)
   let isSeeking = false;
   let rafId = null;
+  let bookmarks = [];   // [{ id, time }] for the currently open project
 
   let bpmSet = false;
   let bpmValue = 120;
@@ -231,6 +235,9 @@
     practiceUploadError.classList.add('hidden');
     practiceFileInput.value = '';
 
+    bookmarks = [];
+    renderBookmarks();
+
     fileInput.value = '';
   }
 
@@ -265,6 +272,9 @@
       updateSeekBarMax();
       updateTimeLabel();
       attemptMirroredGeneration(videoFile);
+
+      bookmarks = Array.isArray(project.bookmarks) ? project.bookmarks : [];
+      renderBookmarks();
 
       if (Array.isArray(project.foundations) && project.foundations.length) {
         renderFoundations(project.foundations);
@@ -361,6 +371,8 @@
       updateTimeLabel();
       attemptMirroredGeneration(file);
       attemptIdentifyFoundations();
+      bookmarks = [];
+      renderBookmarks();
     }, { once: true });
 
     videoOriginal.addEventListener('durationchange', updateSeekBarMax);
@@ -861,6 +873,7 @@
     videoStage.classList.toggle('side-mode', viewMode === 'sidebyside');
     mirrorToggle.classList.toggle('hidden', viewMode === 'sidebyside');
     applyVariantVisibility();
+    syncVideosForModeChange();
   });
 
   mirrorToggle.addEventListener('click', (e) => {
@@ -869,6 +882,7 @@
     variant = btn.dataset.variant;
     [...mirrorToggle.children].forEach(c => c.classList.toggle('active', c === btn));
     applyVariantVisibility();
+    syncVideosForModeChange();
   });
 
   function applyVariantVisibility() {
@@ -881,6 +895,40 @@
     }
   }
   applyVariantVisibility();
+
+  // In single-view mode only one pane is visible — both videos load the same
+  // source (mirroring is a CSS flip), so keeping the hidden one decoding too
+  // was pure waste and the cause of stutter after changing speed. This picks
+  // out whichever element is actually on screen right now.
+  function getActiveVideoEl() {
+    if (viewMode === 'single' && variant === 'mirrored') return videoMirrored;
+    return videoOriginal;
+  }
+
+  // Called whenever viewMode/variant changes so the video that's about to
+  // become hidden gets paused (stops decoding) and the newly-visible one
+  // picks up playback from the same position, preserving play/pause state.
+  function syncVideosForModeChange() {
+    const wasPlaying = !videoOriginal.paused || !videoMirrored.paused;
+    if (viewMode === 'sidebyside') {
+      videoMirrored.currentTime = videoOriginal.currentTime;
+      if (wasPlaying) {
+        videoOriginal.muted = false;
+        videoMirrored.muted = true;
+        videoOriginal.play().catch(() => {});
+        videoMirrored.play().catch(() => {});
+      }
+    } else {
+      const active = getActiveVideoEl();
+      const hidden = active === videoOriginal ? videoMirrored : videoOriginal;
+      hidden.currentTime = active.currentTime;
+      hidden.pause();
+      if (wasPlaying) {
+        active.muted = false;
+        active.play().catch(() => {});
+      }
+    }
+  }
 
   // ---------- Playback sync ----------
   function resetPlaybackUI() {
@@ -909,13 +957,25 @@
   }
 
   playPauseBtn.addEventListener('click', () => {
-    if (videoOriginal.paused) {
-      videoMirrored.currentTime = videoOriginal.currentTime;
-      videoOriginal.muted = false;
-      videoMirrored.muted = true;
-      const p1 = videoOriginal.play();
-      videoMirrored.play().catch(() => {});
-      if (p1 && p1.catch) p1.catch(() => {});
+    const active = getActiveVideoEl();
+    if (active.paused) {
+      if (viewMode === 'sidebyside') {
+        videoMirrored.currentTime = videoOriginal.currentTime;
+        videoOriginal.muted = false;
+        videoMirrored.muted = true;
+        const p1 = videoOriginal.play();
+        videoMirrored.play().catch(() => {});
+        if (p1 && p1.catch) p1.catch(() => {});
+      } else {
+        // Single-view mode: only decode/play the pane that's actually on
+        // screen — playing the hidden twin too was wasted decode work and
+        // caused stutter, especially after changing playback speed.
+        const hidden = active === videoOriginal ? videoMirrored : videoOriginal;
+        hidden.pause();
+        active.muted = false;
+        const p = active.play();
+        if (p && p.catch) p.catch(() => {});
+      }
       playPauseBtn.textContent = '⏸';
       startRAF();
     } else {
@@ -926,9 +986,15 @@
     }
   });
 
-  videoOriginal.addEventListener('ended', () => {
-    playPauseBtn.textContent = '▶';
-    stopRAF();
+  ['ended'].forEach((evt) => {
+    videoOriginal.addEventListener(evt, () => {
+      playPauseBtn.textContent = '▶';
+      stopRAF();
+    });
+    videoMirrored.addEventListener(evt, () => {
+      playPauseBtn.textContent = '▶';
+      stopRAF();
+    });
   });
 
   let seekDebounce = null;
@@ -946,8 +1012,144 @@
   seekBar.addEventListener('pointerup', () => { isSeeking = false; });
   seekBar.addEventListener('change', () => { isSeeking = false; });
 
+  // ---------- Fullscreen ----------
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  fullscreenBtn.addEventListener('click', () => {
+    if (isFullscreen()) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else if (videoStage.requestFullscreen) {
+      videoStage.requestFullscreen().catch(() => {});
+    } else if (videoStage.webkitRequestFullscreen) {
+      videoStage.webkitRequestFullscreen();
+    }
+  });
+
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach((evt) => {
+    document.addEventListener(evt, () => {
+      fullscreenBtn.textContent = isFullscreen() ? '⤢' : '⛶';
+    });
+  });
+
+  // ---------- Bookmarks (jump back to a tricky section without hunting on the seek bar) ----------
+  // Desktop: double-click empty bar to add a marker, double-click a marker to remove it, single-click to jump.
+  // Touch: long-press empty bar to add, long-press a marker to remove, tap to jump.
+  const LONG_PRESS_MS = 550;
+  const LONG_PRESS_MOVE_TOLERANCE = 10;
+
+  function seekToTime(time) {
+    videoOriginal.currentTime = time;
+    videoMirrored.currentTime = time;
+    updateTimeLabel();
+    updateBeatOverlay();
+  }
+
+  function timeFromClientX(clientX) {
+    const rect = seekBar.getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return fraction * (videoOriginal.duration || 0);
+  }
+
+  async function persistBookmarks() {
+    if (!currentProjectId) return;
+    try {
+      currentProject = await window.DanceLensDB.updateProject(currentProjectId, { bookmarks });
+    } catch (e) {
+      console.warn('Could not save bookmarks to this project.', e);
+    }
+  }
+
+  function addBookmark(time) {
+    if (!isFinite(time) || !videoOriginal.duration) return;
+    bookmarks.push({ id: 'bm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), time });
+    bookmarks.sort((a, b) => a.time - b.time);
+    renderBookmarks();
+    persistBookmarks();
+  }
+
+  function removeBookmark(id) {
+    bookmarks = bookmarks.filter((b) => b.id !== id);
+    renderBookmarks();
+    persistBookmarks();
+  }
+
+  function buildBookmarkMarker(bookmark) {
+    const el = document.createElement('div');
+    el.className = 'bookmark-marker';
+    const dur = videoOriginal.duration || 1;
+    el.style.left = Math.min(100, Math.max(0, (bookmark.time / dur) * 100)) + '%';
+    el.title = formatTime(bookmark.time);
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      seekToTime(bookmark.time);
+    });
+    el.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      removeBookmark(bookmark.id);
+    });
+
+    let markerPressTimer = null;
+    el.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      markerPressTimer = setTimeout(() => {
+        markerPressTimer = null;
+        removeBookmark(bookmark.id);
+      }, LONG_PRESS_MS);
+    }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      e.stopPropagation();
+      if (markerPressTimer) {
+        clearTimeout(markerPressTimer);
+        markerPressTimer = null;
+        seekToTime(bookmark.time);
+      }
+    });
+    el.addEventListener('touchmove', (e) => { e.stopPropagation(); });
+
+    return el;
+  }
+
+  function renderBookmarks() {
+    seekBookmarksEl.innerHTML = '';
+    bookmarks.forEach((b) => seekBookmarksEl.appendChild(buildBookmarkMarker(b)));
+  }
+
+  seekBar.addEventListener('dblclick', (e) => {
+    addBookmark(timeFromClientX(e.clientX));
+  });
+
+  let barPressTimer = null;
+  let barPressStart = null;
+  seekBar.addEventListener('touchstart', (e) => {
+    const touch = e.touches[0];
+    barPressStart = { x: touch.clientX, y: touch.clientY };
+    barPressTimer = setTimeout(() => {
+      barPressTimer = null;
+      addBookmark(timeFromClientX(barPressStart.x));
+    }, LONG_PRESS_MS);
+  }, { passive: true });
+  seekBar.addEventListener('touchmove', (e) => {
+    if (!barPressTimer || !barPressStart) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - barPressStart.x);
+    const dy = Math.abs(touch.clientY - barPressStart.y);
+    if (dx > LONG_PRESS_MOVE_TOLERANCE || dy > LONG_PRESS_MOVE_TOLERANCE) {
+      clearTimeout(barPressTimer);
+      barPressTimer = null;
+    }
+  }, { passive: true });
+  seekBar.addEventListener('touchend', () => {
+    if (barPressTimer) { clearTimeout(barPressTimer); barPressTimer = null; }
+  });
+
   function updateTimeLabel() {
-    const cur = videoOriginal.currentTime || 0;
+    const active = getActiveVideoEl();
+    const cur = active.currentTime || 0;
     const dur = videoOriginal.duration || 0;
     timeLabel.textContent = formatTime(cur) + ' / ' + formatTime(dur);
     if (!isSeeking && dur) {
@@ -981,6 +1183,11 @@
   }
 
   function correctDrift() {
+    // Only side-by-side mode has two videos actually decoding/playing at
+    // once — in single mode the hidden twin is paused, so there's nothing
+    // to drift-correct (and nudging its currentTime every frame was doing
+    // needless work).
+    if (viewMode !== 'sidebyside') return;
     if (videoMirrored.readyState < 2) return;
     const drift = Math.abs(videoMirrored.currentTime - videoOriginal.currentTime);
     if (drift > 0.15) {
@@ -992,7 +1199,7 @@
   function updateBeatOverlay() {
     if (!bpmSet) return;
     const secPerBeat = 60 / bpmValue;
-    let elapsed = videoOriginal.currentTime - beatOffset;
+    let elapsed = getActiveVideoEl().currentTime - beatOffset;
     if (elapsed < 0) elapsed = 0;
     const beatFloat = elapsed / secPerBeat;
     const beatIndex = Math.floor(beatFloat);

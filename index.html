@@ -115,8 +115,12 @@
         <!-- Transport controls -->
         <div class="transport">
           <button id="playPauseBtn" class="btn btn-icon" aria-label="Play/Pause">▶</button>
-          <input id="seekBar" class="seek-bar" type="range" min="0" max="1000" value="0" step="1" />
+          <div class="seek-bar-wrap" id="seekBarWrap">
+            <input id="seekBar" class="seek-bar" type="range" min="0" max="1000" value="0" step="1" />
+            <div class="seek-bookmarks" id="seekBookmarks"></div>
+          </div>
           <span id="timeLabel" class="time-label">0:00 / 0:00</span>
+          <button id="fullscreenBtn" class="btn btn-icon" aria-label="Fullscreen">⛶</button>
         </div>
 
         <!-- Speed controls -->

@@ -428,6 +428,29 @@ main {
 
 .video-stage.single-mode .pane-label { display: none; }
 
+.video-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-stage:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-stage:fullscreen .video-pane,
+.video-stage:-webkit-full-screen .video-pane {
+  max-height: 100vh;
+  height: 100vh;
+}
+
 /* Beat overlay */
 .beat-overlay {
   position: absolute;
@@ -473,13 +496,45 @@ main {
   margin-bottom: 22px;
 }
 
-.seek-bar {
+.seek-bar-wrap {
+  position: relative;
   flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.seek-bar {
+  width: 100%;
   appearance: none;
   height: 6px;
   border-radius: 999px;
   background: var(--bg-raised-2);
   outline: none;
+}
+
+.seek-bookmarks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bookmark-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-raised);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.bookmark-marker:hover {
+  transform: translate(-50%, -50%) scale(1.25);
 }
 
 .seek-bar::-webkit-slider-thumb {
