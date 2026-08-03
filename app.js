@@ -22,6 +22,8 @@
   const fileInput      = document.getElementById('fileInput');
   const uploadError    = document.getElementById('uploadError');
 
+  const genIdle         = document.getElementById('genIdle');
+  const generateMirroredBtn = document.getElementById('generateMirroredBtn');
   const genStatus      = document.getElementById('genStatus');
   const genStatusText  = document.getElementById('genStatusText');
   const genProgressBar = document.getElementById('genProgressBar');
@@ -90,6 +92,7 @@
   let originalURL = null;
   let practiceURL = null;
   let mirroredDownloadURL = null;
+  let pendingMirrorSourceFile = null;   // set once metadata loads; generation only starts on demand
   let currentRate = 1.0;
   let viewMode = 'single';     // 'single' | 'sidebyside'
   let variant = 'original';    // 'original' | 'mirrored' (single mode only)
@@ -217,6 +220,8 @@
 
     if (originalURL) { URL.revokeObjectURL(originalURL); originalURL = null; }
     if (mirroredDownloadURL) { URL.revokeObjectURL(mirroredDownloadURL); mirroredDownloadURL = null; }
+    pendingMirrorSourceFile = null;
+    genIdle.classList.add('hidden');
     genStatus.classList.add('hidden');
     genStatus.querySelectorAll('.gen-download-link').forEach(el => el.remove());
 
@@ -271,7 +276,7 @@
     videoOriginal.addEventListener('loadedmetadata', () => {
       updateSeekBarMax();
       updateTimeLabel();
-      attemptMirroredGeneration(videoFile);
+      offerMirroredGeneration(videoFile);
 
       bookmarks = Array.isArray(project.bookmarks) ? project.bookmarks : [];
       renderBookmarks();
@@ -369,7 +374,7 @@
     videoOriginal.addEventListener('loadedmetadata', () => {
       updateSeekBarMax();
       updateTimeLabel();
-      attemptMirroredGeneration(file);
+      offerMirroredGeneration(file);
       attemptIdentifyFoundations();
       bookmarks = [];
       renderBookmarks();
@@ -388,10 +393,27 @@
   }
 
   // ---------- Mirrored video generation (canvas + MediaRecorder) ----------
+  // Generating the downloadable mirrored file plays a whole extra hidden copy
+  // of the video in real time (to draw/record it) — running that automatically
+  // on load competed with the actual playback for CPU and was the cause of
+  // choppy video and a seek bar that lagged behind. Live mirrored viewing
+  // (the Original/Mirrored toggle above) is unaffected — that's just CSS.
   function canGenerateMirroredFile() {
     return typeof HTMLCanvasElement.prototype.captureStream === 'function' &&
            typeof window.MediaRecorder !== 'undefined';
   }
+
+  function offerMirroredGeneration(file) {
+    pendingMirrorSourceFile = file;
+    if (canGenerateMirroredFile()) {
+      genIdle.classList.remove('hidden');
+    }
+  }
+
+  generateMirroredBtn.addEventListener('click', () => {
+    genIdle.classList.add('hidden');
+    if (pendingMirrorSourceFile) attemptMirroredGeneration(pendingMirrorSourceFile);
+  });
 
   function attemptMirroredGeneration(file) {
     if (!canGenerateMirroredFile()) {

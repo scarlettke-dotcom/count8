@@ -64,7 +64,13 @@
 
       <div class="main-column">
 
-        <!-- Generation status -->
+        <!-- Mirrored download: generated on demand, not automatically — running
+             the background canvas/MediaRecorder capture at load time competed
+             with the actual playback for CPU and made the video choppy and the
+             seek bar lag. Live mirrored viewing above is unaffected (CSS flip). -->
+        <div id="genIdle" class="gen-status hidden">
+          <button id="generateMirroredBtn" class="btn btn-ghost" data-i18n="gen_generate_btn">Generate mirrored video for download</button>
+        </div>
         <div id="genStatus" class="gen-status hidden">
           <div class="spinner"></div>
           <span id="genStatusText" data-i18n="gen_status_generating">Generating mirrored video…</span>

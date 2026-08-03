@@ -75,6 +75,7 @@
       upload_error_invalid: 'Please upload an MP4 or MOV video file.',
 
       // Mirrored generation status
+      gen_generate_btn: 'Generate mirrored video for download',
       gen_status_generating: 'Generating mirrored video…',
       gen_status_ready: 'Mirrored video ready.',
       gen_status_live_no_export: "Live mirrored preview is ready (this browser can't export a mirrored file).",
@@ -234,6 +235,7 @@
       choose_video: '选择视频',
       upload_error_invalid: '请上传 MP4 或 MOV 格式的视频文件。',
 
+      gen_generate_btn: '生成可下载的镜像视频',
       gen_status_generating: '正在生成镜像视频…',
       gen_status_ready: '镜像视频已生成。',
       gen_status_live_no_export: '实时镜像预览已就绪（此浏览器无法导出镜像视频文件）。',
