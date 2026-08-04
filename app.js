@@ -53,6 +53,7 @@
   const setBpmBtn       = document.getElementById('setBpmBtn');
   const bpmDotSmall     = document.getElementById('bpmDotSmall');
 
+  const playerPanel   = document.getElementById('playerPanel');
   const videoStage    = document.getElementById('videoStage');
   const paneOriginal  = document.getElementById('paneOriginal');
   const paneMirrored  = document.getElementById('paneMirrored');
@@ -273,7 +274,8 @@
     videoMirrored.src = originalURL;
     resetPlaybackUI();
 
-    videoOriginal.addEventListener('loadedmetadata', () => {
+    videoOriginal.addEventListener('loadedmetadata', async () => {
+      await ensureFiniteDuration(videoOriginal);
       updateSeekBarMax();
       updateTimeLabel();
       offerMirroredGeneration(videoFile);
@@ -371,7 +373,8 @@
 
     resetPlaybackUI();
 
-    videoOriginal.addEventListener('loadedmetadata', () => {
+    videoOriginal.addEventListener('loadedmetadata', async () => {
+      await ensureFiniteDuration(videoOriginal);
       updateSeekBarMax();
       updateTimeLabel();
       offerMirroredGeneration(file);
@@ -390,6 +393,40 @@
     }
     // If duration isn't known yet (some sources report it late), the 'durationchange'
     // listener will call this again once the browser resolves it.
+  }
+
+  // Some real video files (certain MP4/MOV containers, particularly ones
+  // whose duration atom isn't at the front) report duration as Infinity
+  // until the browser is forced to seek near the end. Left unfixed, every
+  // seek-bar calculation divides by Infinity and silently comes out ~0 —
+  // the bar never advances during playback and dragging it barely moves
+  // the video, since seekBar.max was never updated off its tiny default.
+  // Only kicks in when actually needed, so normal videos are unaffected.
+  function ensureFiniteDuration(videoEl) {
+    return new Promise((resolve) => {
+      if (isFinite(videoEl.duration) && videoEl.duration > 0) {
+        resolve(videoEl.duration);
+        return;
+      }
+      const onTimeUpdate = () => {
+        videoEl.removeEventListener('timeupdate', onTimeUpdate);
+        videoEl.currentTime = 0;
+      };
+      const onSeeked = () => {
+        videoEl.removeEventListener('seeked', onSeeked);
+        resolve(videoEl.duration);
+      };
+      videoEl.addEventListener('timeupdate', onTimeUpdate);
+      videoEl.addEventListener('seeked', onSeeked);
+      videoEl.currentTime = 1e10;
+      // Belt-and-suspenders: if neither event fires (some browsers/formats
+      // never recover), don't hang the rest of setup forever.
+      setTimeout(() => {
+        videoEl.removeEventListener('timeupdate', onTimeUpdate);
+        videoEl.removeEventListener('seeked', onSeeked);
+        resolve(videoEl.duration);
+      }, 2000);
+    });
   }
 
   // ---------- Mirrored video generation (canvas + MediaRecorder) ----------
@@ -1043,10 +1080,13 @@
     if (isFullscreen()) {
       if (document.exitFullscreen) document.exitFullscreen();
       else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    } else if (videoStage.requestFullscreen) {
-      videoStage.requestFullscreen().catch(() => {});
-    } else if (videoStage.webkitRequestFullscreen) {
-      videoStage.webkitRequestFullscreen();
+    } else if (playerPanel.requestFullscreen) {
+      // Fullscreen the whole player panel (toolbar + video + transport +
+      // speed), not just the video, so speed/mirror/seek controls stay
+      // reachable without dropping back to windowed mode.
+      playerPanel.requestFullscreen().catch(() => {});
+    } else if (playerPanel.webkitRequestFullscreen) {
+      playerPanel.webkitRequestFullscreen();
     }
   });
 

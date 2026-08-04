@@ -77,6 +77,10 @@
           <div class="gen-progress-track"><div id="genProgressBar" class="gen-progress-bar"></div></div>
         </div>
 
+        <!-- Player panel: wrapped so speed/mirror/seek-bar controls stay
+             usable when the video goes fullscreen, not just the video itself. -->
+        <div class="player-panel" id="playerPanel">
+
         <!-- View mode toggles -->
         <div class="toolbar">
           <div class="segmented" id="viewModeToggle" role="tablist" aria-label="View mode">
@@ -133,6 +137,8 @@
         <div class="speed-section">
           <h2 class="section-title" data-i18n="speed_title">Playback Speed</h2>
           <div id="speedButtons" class="speed-grid"></div>
+        </div>
+
         </div>
 
       </div>

@@ -428,27 +428,48 @@ main {
 
 .video-stage.single-mode .pane-label { display: none; }
 
-.video-stage:fullscreen {
+/* Fullscreen the whole player panel (toolbar + video + transport + speed),
+   not just the video, so speed/mirror/seek-bar stay usable without dropping
+   back to windowed mode first. */
+.player-panel:fullscreen,
+.player-panel:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
-  border-radius: 0;
+  background: #000;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-.video-stage:-webkit-full-screen {
-  width: 100vw;
-  height: 100vh;
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+  overflow-y: auto;
 }
 
-.video-stage:fullscreen .video-pane,
-.video-stage:-webkit-full-screen .video-pane {
-  max-height: 100vh;
-  height: 100vh;
+.player-panel:fullscreen .toolbar,
+.player-panel:-webkit-full-screen .toolbar,
+.player-panel:fullscreen .transport,
+.player-panel:-webkit-full-screen .transport,
+.player-panel:fullscreen .speed-section,
+.player-panel:-webkit-full-screen .speed-section {
+  width: 100%;
+  max-width: 480px;
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.player-panel:fullscreen .video-stage,
+.player-panel:-webkit-full-screen .video-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: auto;
+  max-width: 100%;
+  margin-bottom: 0;
+}
+
+.player-panel:fullscreen .video-stage .video-pane,
+.player-panel:-webkit-full-screen .video-stage .video-pane {
+  height: 100%;
+  max-height: 60vh;
 }
 
 /* Beat overlay */
