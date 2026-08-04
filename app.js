@@ -1071,29 +1071,36 @@
   seekBar.addEventListener('pointerup', () => { isSeeking = false; });
   seekBar.addEventListener('change', () => { isSeeking = false; });
 
-  // ---------- Fullscreen ----------
-  function isFullscreen() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  // ---------- Theater mode (custom overlay, not the native Fullscreen API) ----------
+  // iOS Safari doesn't reliably support requestFullscreen() on plain
+  // elements (only on <video> itself), so that route left the panel stuck
+  // at its normal inline size. A fixed-position CSS overlay works the same
+  // way on every device. Tapping the video toggles the overlaid controls,
+  // matching how YouTube/Bilibili's players behave.
+  function isTheaterMode() {
+    return playerPanel.classList.contains('theater-mode');
   }
 
-  fullscreenBtn.addEventListener('click', () => {
-    if (isFullscreen()) {
-      if (document.exitFullscreen) document.exitFullscreen();
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    } else if (playerPanel.requestFullscreen) {
-      // Fullscreen the whole player panel (toolbar + video + transport +
-      // speed), not just the video, so speed/mirror/seek controls stay
-      // reachable without dropping back to windowed mode.
-      playerPanel.requestFullscreen().catch(() => {});
-    } else if (playerPanel.webkitRequestFullscreen) {
-      playerPanel.webkitRequestFullscreen();
-    }
+  function setTheaterMode(on) {
+    playerPanel.classList.toggle('theater-mode', on);
+    playerPanel.classList.remove('controls-hidden');
+    document.body.classList.toggle('theater-lock', on);
+    fullscreenBtn.textContent = on ? '⤢' : '⛶';
+  }
+
+  fullscreenBtn.addEventListener('click', () => setTheaterMode(!isTheaterMode()));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isTheaterMode()) setTheaterMode(false);
   });
 
-  ['fullscreenchange', 'webkitfullscreenchange'].forEach((evt) => {
-    document.addEventListener(evt, () => {
-      fullscreenBtn.textContent = isFullscreen() ? '⤢' : '⛶';
-    });
+  // Tap/click the video itself to show/hide the overlaid controls — only
+  // meaningful in theater mode; a normal inline click on the video does
+  // nothing special.
+  videoStage.addEventListener('click', (e) => {
+    if (!isTheaterMode()) return;
+    if (e.target.closest('.toolbar, .bottom-controls')) return;
+    playerPanel.classList.toggle('controls-hidden');
   });
 
   // ---------- Bookmarks (jump back to a tricky section without hunting on the seek bar) ----------
@@ -1215,7 +1222,10 @@
     const dur = videoOriginal.duration || 0;
     timeLabel.textContent = formatTime(cur) + ' / ' + formatTime(dur);
     if (!isSeeking && dur) {
-      seekBar.value = String(Math.floor((cur / dur) * 1000));
+      // seekBar.max is duration expressed in milliseconds (see
+      // updateSeekBarMax), so value must be on that same scale — not a
+      // 0-1000 fraction, which only coincidentally matched for ~1s clips.
+      seekBar.value = String(Math.floor(cur * 1000));
     }
   }
 
