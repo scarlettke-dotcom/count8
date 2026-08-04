@@ -38,9 +38,9 @@ const OUTPUT_SCHEMA_FEEDBACK = {
   type: 'object',
   properties: {
     summary: { type: 'string' },
-    accuracy_score: { type: 'integer', minimum: 0, maximum: 100 },
-    timing_score: { type: 'integer', minimum: 0, maximum: 100 },
-    movement_stability_score: { type: 'integer', minimum: 0, maximum: 100 },
+    accuracy_score: { type: 'integer' },
+    timing_score: { type: 'integer' },
+    movement_stability_score: { type: 'integer' },
     issues: {
       type: 'array',
       items: {
