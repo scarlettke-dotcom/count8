@@ -91,6 +91,7 @@
   const alignBeatBtn     = document.getElementById('alignBeatBtn');
   const closeBpmModalBtn = document.getElementById('closeBpmModalBtn');
   const clearBpmBtn      = document.getElementById('clearBpmBtn');
+  const voiceCountToggle = document.getElementById('voiceCountToggle');
 
   const SPEEDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
   const BEATS_PER_COUNT = 8;
@@ -122,6 +123,10 @@
   let beatOffset = 0;
   let lastCountInEight = null;
   let tapTimes = [];
+  // Voice count-out preference persists across sessions like the language
+  // choice, since it's a personal setting rather than per-project state.
+  let voiceCountEnabled = false;
+  try { voiceCountEnabled = window.localStorage.getItem('count8_voice_count') === '1'; } catch (e) { /* ignore */ }
   let detectedTapBpm = null;
 
   videoMirrored.classList.add('css-mirrored');
@@ -1022,7 +1027,24 @@
 
   comparePlayPauseBtn.addEventListener('click', () => {
     if (referenceCompareVideo.paused) {
-      practiceVideo.currentTime = clampPracticeTime(referenceCompareVideo.currentTime);
+      // If playback previously ran to the end, currentTime is still sitting
+      // at (or right next to) duration. Calling .play() on a video that's
+      // already at its end makes the browser silently restart it from 0 —
+      // but if we first sync practiceVideo to that stale end-of-video
+      // position (its normal job mid-playback), practiceVideo gets seeked
+      // to ~its own end and then immediately re-seeked to 0 by that same
+      // browser auto-restart. Two conflicting seeks back-to-back is what
+      // was causing the bad stutter on every second playthrough. Detect
+      // "finished" explicitly and restart both from their aligned start
+      // instead of syncing to the stale end position.
+      const refFinished = referenceCompareVideo.ended ||
+        (referenceCompareVideo.duration && referenceCompareVideo.currentTime >= referenceCompareVideo.duration - 0.05);
+      if (refFinished) {
+        referenceCompareVideo.currentTime = 0;
+        practiceVideo.currentTime = clampPracticeTime(0);
+      } else {
+        practiceVideo.currentTime = clampPracticeTime(referenceCompareVideo.currentTime);
+      }
       referenceCompareVideo.muted = false;
       practiceVideo.muted = true;
       const p1 = referenceCompareVideo.play();
@@ -1042,6 +1064,13 @@
     referenceCompareVideo.addEventListener(evt, () => {
       comparePlayPauseBtn.textContent = '▶';
       stopCompareRAF();
+    });
+    // practiceVideo can finish before or after referenceCompareVideo
+    // depending on align offset/duration mismatch — pause it too so it
+    // doesn't keep playing un-synced once the reference has stopped, or
+    // sit un-paused if it finishes first.
+    practiceVideo.addEventListener(evt, () => {
+      practiceVideo.pause();
     });
   });
 
@@ -1262,6 +1291,7 @@
       videoMirrored.pause();
       playPauseBtn.textContent = '▶';
       stopRAF();
+      if (canSpeak) window.speechSynthesis.cancel();
     }
   });
 
@@ -1269,6 +1299,7 @@
     videoOriginal.addEventListener(evt, () => {
       playPauseBtn.textContent = '▶';
       stopRAF();
+      if (canSpeak) window.speechSynthesis.cancel();
     });
     videoMirrored.addEventListener(evt, () => {
       playPauseBtn.textContent = '▶';
@@ -1488,6 +1519,23 @@
   }
 
   // ---------- Beat counter overlay ----------
+  // No recorded voice-count audio files exist (and hosting/recording a full
+  // 1-8 counting track wasn't practical here), so voice count-out is done
+  // via the browser's built-in text-to-speech instead of an <audio> file.
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  function speakCount(n) {
+    if (!canSpeak) return;
+    // Cancel whatever's still queued/speaking first — at faster tempos a
+    // previous utterance can easily still be running when the next beat
+    // hits, and overlapping/queued speech quickly falls behind the video.
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(String(n));
+    utter.lang = window.DanceLensI18n.getLang() === 'zh' ? 'zh-CN' : 'en-US';
+    utter.rate = 1.3;
+    utter.volume = 1;
+    window.speechSynthesis.speak(utter);
+  }
+
   function updateBeatOverlay() {
     if (!bpmSet) return;
     const secPerBeat = 60 / bpmValue;
@@ -1504,6 +1552,9 @@
       void beatCountEl.offsetWidth;
       beatCountEl.classList.add('pulse');
       setTimeout(() => beatCountEl.classList.remove('pulse'), 150);
+      if (voiceCountEnabled && !getActiveVideoEl().paused) {
+        speakCount(countInEight);
+      }
     }
   }
 
@@ -1515,6 +1566,8 @@
     detectedTapBpm = null;
     tapBpmReadout.textContent = '—';
     useTapBpmBtn.disabled = true;
+    voiceCountToggle.checked = voiceCountEnabled;
+    voiceCountToggle.disabled = !canSpeak;
   }
   function closeBpmModal() {
     bpmModal.classList.add('hidden');
@@ -1571,7 +1624,14 @@
     bpmSet = false;
     beatOverlay.classList.add('hidden');
     bpmDotSmall.classList.remove('live');
+    if (canSpeak) window.speechSynthesis.cancel();
     closeBpmModal();
+  });
+
+  voiceCountToggle.addEventListener('change', () => {
+    voiceCountEnabled = voiceCountToggle.checked;
+    try { window.localStorage.setItem('count8_voice_count', voiceCountEnabled ? '1' : '0'); } catch (e) { /* ignore */ }
+    if (!voiceCountEnabled && canSpeak) window.speechSynthesis.cancel();
   });
 
   function activateBpm(val) {

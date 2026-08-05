@@ -1050,6 +1050,24 @@ video.css-mirrored {
   line-height: 1.4;
 }
 
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  color: var(--text) !important;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .modal-actions {
   display: flex;
   justify-content: space-between;

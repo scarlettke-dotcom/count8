@@ -131,6 +131,8 @@
       bpm_aligned: 'Aligned ✓',
       bpm_close: 'Close',
       bpm_turn_off: 'Turn off beat overlay',
+      bpm_voice_count_label: 'Voice count-out',
+      bpm_voice_count_hint: 'Speaks each count (1-8) out loud as the beat overlay ticks, using your device\'s text-to-speech.',
 
       // Practice Journal
       journal_log_title: 'Log a Practice Session',
@@ -293,6 +295,8 @@
       bpm_aligned: '已对齐 ✓',
       bpm_close: '关闭',
       bpm_turn_off: '关闭节拍显示',
+      bpm_voice_count_label: '语音喊拍',
+      bpm_voice_count_hint: '节拍跳动时，用你设备的语音朗读功能喊出每个拍数（1-8）。',
 
       journal_log_title: '记录一次练习',
       journal_date_label: '日期',
