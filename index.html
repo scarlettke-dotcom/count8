@@ -181,11 +181,13 @@
       <div id="practiceCompareStage" class="practice-compare-stage hidden">
         <div class="practice-video-pane">
           <span class="pane-label" data-i18n="practice_pane_reference">Original Choreography</span>
+          <button id="mirrorReferenceBtn" class="btn btn-icon compare-mirror-btn" aria-label="Mirror this video" title="Mirror">⇋</button>
           <video id="referenceCompareVideo" playsinline muted></video>
           <button id="alignReferenceBtn" class="btn btn-ghost align-btn" data-i18n="practice_align_btn">Set Align Point Here</button>
         </div>
         <div class="practice-video-pane">
           <span class="pane-label" data-i18n="practice_pane_practice">Your Practice</span>
+          <button id="mirrorPracticeBtn" class="btn btn-icon compare-mirror-btn" aria-label="Mirror this video" title="Mirror">⇋</button>
           <video id="practiceVideo" playsinline></video>
           <div id="timingAnnotation" class="timing-annotation hidden"></div>
           <button id="alignPracticeBtn" class="btn btn-ghost align-btn" data-i18n="practice_align_btn">Set Align Point Here</button>

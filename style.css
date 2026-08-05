@@ -410,7 +410,8 @@ main {
   background: #000;
 }
 
-.video-pane[data-role="mirrored"] video.css-mirrored {
+.video-pane[data-role="mirrored"] video.css-mirrored,
+video.css-mirrored {
   transform: scaleX(-1);
 }
 
@@ -848,6 +849,26 @@ main {
   max-height: 60vh;
   display: block;
   background: #000;
+}
+
+.compare-mirror-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  width: 32px;
+  height: 32px;
+  min-height: unset;
+  font-size: 0.95rem;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--text);
+  box-shadow: none;
+}
+.compare-mirror-btn:hover { background: rgba(0,0,0,0.75); }
+.compare-mirror-btn.active {
+  background: var(--accent);
+  color: #1a0d29;
 }
 
 .align-btn {

@@ -42,6 +42,8 @@
   const alignReferenceBtn     = document.getElementById('alignReferenceBtn');
   const alignPracticeBtn      = document.getElementById('alignPracticeBtn');
   const clearAlignBtn         = document.getElementById('clearAlignBtn');
+  const mirrorReferenceBtn    = document.getElementById('mirrorReferenceBtn');
+  const mirrorPracticeBtn     = document.getElementById('mirrorPracticeBtn');
   const timingAnnotation      = document.getElementById('timingAnnotation');
   const practiceCompareTransport = document.getElementById('practiceCompareTransport');
   const comparePlayPauseBtn   = document.getElementById('comparePlayPauseBtn');
@@ -999,7 +1001,24 @@
     practiceCompareTransport.classList.add('hidden');
     timingAnnotation.classList.add('hidden');
     compareSeekBar.value = 0;
+    referenceCompareVideo.classList.remove('css-mirrored');
+    practiceVideo.classList.remove('css-mirrored');
+    mirrorReferenceBtn.classList.remove('active');
+    mirrorPracticeBtn.classList.remove('active');
   }
+
+  // Practice videos can come from a front camera (naturally mirrored, like
+  // looking in a mirror) or a back camera (not mirrored) — either video here
+  // might need flipping to visually line up with the other, so both get a
+  // toggle rather than assuming which one is "correct".
+  mirrorReferenceBtn.addEventListener('click', () => {
+    const on = referenceCompareVideo.classList.toggle('css-mirrored');
+    mirrorReferenceBtn.classList.toggle('active', on);
+  });
+  mirrorPracticeBtn.addEventListener('click', () => {
+    const on = practiceVideo.classList.toggle('css-mirrored');
+    mirrorPracticeBtn.classList.toggle('active', on);
+  });
 
   comparePlayPauseBtn.addEventListener('click', () => {
     if (referenceCompareVideo.paused) {
