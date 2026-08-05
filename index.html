@@ -181,13 +181,26 @@
       <div id="practiceCompareStage" class="practice-compare-stage hidden">
         <div class="practice-video-pane">
           <span class="pane-label" data-i18n="practice_pane_reference">Original Choreography</span>
-          <video id="referenceCompareVideo" playsinline muted controls></video>
+          <video id="referenceCompareVideo" playsinline muted></video>
+          <button id="alignReferenceBtn" class="btn btn-ghost align-btn" data-i18n="practice_align_btn">Set Align Point Here</button>
         </div>
         <div class="practice-video-pane">
           <span class="pane-label" data-i18n="practice_pane_practice">Your Practice</span>
-          <video id="practiceVideo" playsinline controls></video>
+          <video id="practiceVideo" playsinline></video>
+          <div id="timingAnnotation" class="timing-annotation hidden"></div>
+          <button id="alignPracticeBtn" class="btn btn-ghost align-btn" data-i18n="practice_align_btn">Set Align Point Here</button>
         </div>
       </div>
+
+      <div id="practiceCompareTransport" class="practice-compare-transport hidden">
+        <button id="comparePlayPauseBtn" class="btn btn-icon" aria-label="Play/Pause">▶</button>
+        <div class="seek-bar-wrap" id="compareSeekBarWrap">
+          <input id="compareSeekBar" class="seek-bar" type="range" min="0" max="1000" value="0" step="1" />
+        </div>
+        <span id="compareTimeLabel" class="time-label">0:00 / 0:00</span>
+        <button id="clearAlignBtn" class="btn btn-ghost" data-i18n="practice_align_reset">Reset Align</button>
+      </div>
+      <p class="hint-text practice-align-hint" data-i18n="practice_align_hint">Both videos play together from the start by default. If your practice video doesn't start at the same moment, pause each on a matching beat and tap "Set Align Point Here" on both.</p>
 
       <div id="practiceFeedbackStatus" class="gen-status hidden">
         <div class="spinner"></div>

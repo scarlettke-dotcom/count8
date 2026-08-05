@@ -39,6 +39,14 @@
   const practiceCompareStage  = document.getElementById('practiceCompareStage');
   const referenceCompareVideo = document.getElementById('referenceCompareVideo');
   const practiceVideo         = document.getElementById('practiceVideo');
+  const alignReferenceBtn     = document.getElementById('alignReferenceBtn');
+  const alignPracticeBtn      = document.getElementById('alignPracticeBtn');
+  const clearAlignBtn         = document.getElementById('clearAlignBtn');
+  const timingAnnotation      = document.getElementById('timingAnnotation');
+  const practiceCompareTransport = document.getElementById('practiceCompareTransport');
+  const comparePlayPauseBtn   = document.getElementById('comparePlayPauseBtn');
+  const compareSeekBar        = document.getElementById('compareSeekBar');
+  const compareTimeLabel      = document.getElementById('compareTimeLabel');
   const practiceFeedbackStatus     = document.getElementById('practiceFeedbackStatus');
   const practiceFeedbackStatusText = document.getElementById('practiceFeedbackStatusText');
   const practiceFeedbackResults    = document.getElementById('practiceFeedbackResults');
@@ -100,6 +108,12 @@
   let isSeeking = false;
   let rafId = null;
   let bookmarks = [];   // [{ id, time }] for the currently open project
+
+  // ---------- Practice compare-stage sync state ----------
+  let referenceAlignTime = 0;   // seconds, paused position marked in the reference video
+  let practiceAlignTime = 0;    // seconds, paused position marked in the practice video
+  let compareRafId = null;
+  let lastPracticeIssues = [];  // most recent practice feedback issues, for the timing overlay
 
   let bpmSet = false;
   let bpmValue = 120;
@@ -232,6 +246,7 @@
 
     if (practiceURL) { URL.revokeObjectURL(practiceURL); practiceURL = null; }
     currentPracticeFile = null;
+    resetCompareSync();
     practiceVideo.removeAttribute('src');
     referenceCompareVideo.removeAttribute('src');
     practiceCompareStage.classList.add('hidden');
@@ -297,6 +312,8 @@
         referenceCompareVideo.src = originalURL;
         practiceVideo.src = practiceURL;
         practiceCompareStage.classList.remove('hidden');
+        referenceCompareVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(referenceCompareVideo), { once: true });
+        practiceVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(practiceVideo), { once: true });
         renderPracticeFeedback(latest.feedback);
       }
     }, { once: true });
@@ -610,6 +627,9 @@
         const ctx = canvas.getContext('2d');
 
         const fractions = [0.08, 0.26, 0.44, 0.62, 0.8, 0.92].slice(0, count);
+        // Each frame carries the exact timestamp it was captured at, so
+        // callers that need it (practice feedback issue timestamps) can use
+        // it — callers that just want images can map to .dataUrl.
         const frames = [];
 
         function captureNext(i) {
@@ -622,7 +642,7 @@
           const onSeeked = () => {
             offVideo.removeEventListener('seeked', onSeeked);
             ctx.drawImage(offVideo, 0, 0, canvas.width, canvas.height);
-            frames.push(canvas.toDataURL('image/jpeg', 0.6));
+            frames.push({ dataUrl: canvas.toDataURL('image/jpeg', 0.6), time: target });
             captureNext(i + 1);
           };
           offVideo.addEventListener('seeked', onSeeked);
@@ -659,7 +679,7 @@
       const res = await fetch('/api/identify-foundations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frames, lang: window.DanceLensI18n.getLang() }),
+        body: JSON.stringify({ frames: frames.map((f) => f.dataUrl), lang: window.DanceLensI18n.getLang() }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -752,6 +772,28 @@
     nameWrap.appendChild(badge);
     nameWrap.appendChild(nameText);
 
+    // Practice-feedback issues carry a timestamp in the practice video and
+    // (for timing issues) whether the student was early or late — foundation
+    // techniques don't have these fields, so this simply doesn't render there.
+    if (typeof technique.timestamp_seconds === 'number') {
+      const tsBadge = document.createElement('span');
+      tsBadge.className = 'tech-timestamp';
+      tsBadge.textContent = formatTime(technique.timestamp_seconds);
+      tsBadge.title = t('issue_jump_to_time');
+      tsBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        seekPracticeCompareTo(technique.timestamp_seconds);
+      });
+      nameWrap.appendChild(tsBadge);
+
+      if (technique.timing_direction === 'late' || technique.timing_direction === 'early') {
+        const dirBadge = document.createElement('span');
+        dirBadge.className = 'tech-timing-direction ' + technique.timing_direction;
+        dirBadge.textContent = technique.timing_direction === 'late' ? t('timing_label_late') : t('timing_label_early');
+        nameWrap.appendChild(dirBadge);
+      }
+    }
+
     const chevron = document.createElement('span');
     chevron.className = 'chevron';
     chevron.textContent = '▾';
@@ -841,6 +883,9 @@
     referenceCompareVideo.src = originalURL;
     practiceVideo.src = practiceURL;
     practiceCompareStage.classList.remove('hidden');
+    resetCompareSync();
+    referenceCompareVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(referenceCompareVideo), { once: true });
+    practiceVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(practiceVideo), { once: true });
 
     practiceFeedbackResults.classList.add('hidden');
     practiceFeedbackCards.innerHTML = '';
@@ -872,7 +917,12 @@
       const res = await fetch('/api/analyze-practice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referenceFrames, practiceFrames, lang: window.DanceLensI18n.getLang() }),
+        body: JSON.stringify({
+          referenceFrames: referenceFrames.map((f) => f.dataUrl),
+          practiceFrames: practiceFrames.map((f) => f.dataUrl),
+          practiceFrameTimestamps: practiceFrames.map((f) => f.time),
+          lang: window.DanceLensI18n.getLang(),
+        }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -919,6 +969,157 @@
       practiceFeedbackCards.appendChild(buildFoundationCard(issue, index));
     });
     practiceFeedbackResults.classList.remove('hidden');
+
+    lastPracticeIssues = data.issues || [];
+    practiceCompareTransport.classList.remove('hidden');
+  }
+
+  // ---------- Synced side-by-side compare playback ----------
+  // The reference video is the "clock"; the practice video is kept aligned
+  // to it via a constant offset (practiceAlignTime - referenceAlignTime),
+  // which defaults to 0 (both start together) and can be refined with the
+  // align buttons for practice videos that don't start at the same moment.
+  function getCompareOffset() {
+    return practiceAlignTime - referenceAlignTime;
+  }
+
+  function clampPracticeTime(refTime) {
+    const dur = practiceVideo.duration || 0;
+    return Math.max(0, Math.min(dur, refTime + getCompareOffset()));
+  }
+
+  function resetCompareSync() {
+    stopCompareRAF();
+    referenceAlignTime = 0;
+    practiceAlignTime = 0;
+    lastPracticeIssues = [];
+    referenceCompareVideo.pause();
+    practiceVideo.pause();
+    comparePlayPauseBtn.textContent = '▶';
+    practiceCompareTransport.classList.add('hidden');
+    timingAnnotation.classList.add('hidden');
+    compareSeekBar.value = 0;
+  }
+
+  comparePlayPauseBtn.addEventListener('click', () => {
+    if (referenceCompareVideo.paused) {
+      practiceVideo.currentTime = clampPracticeTime(referenceCompareVideo.currentTime);
+      referenceCompareVideo.muted = false;
+      practiceVideo.muted = true;
+      const p1 = referenceCompareVideo.play();
+      practiceVideo.play().catch(() => {});
+      if (p1 && p1.catch) p1.catch(() => {});
+      comparePlayPauseBtn.textContent = '⏸';
+      startCompareRAF();
+    } else {
+      referenceCompareVideo.pause();
+      practiceVideo.pause();
+      comparePlayPauseBtn.textContent = '▶';
+      stopCompareRAF();
+    }
+  });
+
+  ['ended'].forEach((evt) => {
+    referenceCompareVideo.addEventListener(evt, () => {
+      comparePlayPauseBtn.textContent = '▶';
+      stopCompareRAF();
+    });
+  });
+
+  function updateCompareSeekMax() {
+    const dur = referenceCompareVideo.duration;
+    if (isFinite(dur) && dur > 0) {
+      compareSeekBar.max = String(Math.floor(dur * 1000));
+    }
+  }
+  referenceCompareVideo.addEventListener('loadedmetadata', updateCompareSeekMax);
+  referenceCompareVideo.addEventListener('durationchange', updateCompareSeekMax);
+
+  let isCompareSeeking = false;
+  compareSeekBar.addEventListener('pointerdown', () => { isCompareSeeking = true; });
+  compareSeekBar.addEventListener('pointerup', () => { isCompareSeeking = false; });
+  compareSeekBar.addEventListener('change', () => { isCompareSeeking = false; });
+  compareSeekBar.addEventListener('input', () => {
+    const target = parseFloat(compareSeekBar.value) / 1000;
+    if (!referenceCompareVideo.duration) return;
+    referenceCompareVideo.currentTime = target;
+    practiceVideo.currentTime = clampPracticeTime(target);
+    updateCompareTimeLabel();
+  });
+
+  function updateCompareTimeLabel() {
+    const cur = referenceCompareVideo.currentTime || 0;
+    const dur = referenceCompareVideo.duration || 0;
+    compareTimeLabel.textContent = formatTime(cur) + ' / ' + formatTime(dur);
+    if (!isCompareSeeking && dur) {
+      compareSeekBar.value = String(Math.floor(cur * 1000));
+    }
+  }
+
+  function updateTimingAnnotation() {
+    const cur = practiceVideo.currentTime;
+    const match = lastPracticeIssues.find((issue) =>
+      (issue.timing_direction === 'late' || issue.timing_direction === 'early') &&
+      typeof issue.timestamp_seconds === 'number' &&
+      Math.abs(cur - issue.timestamp_seconds) <= 0.75
+    );
+    if (match) {
+      timingAnnotation.textContent = match.timing_direction === 'late' ? t('timing_label_late') : t('timing_label_early');
+      timingAnnotation.className = 'timing-annotation ' + match.timing_direction;
+    } else {
+      timingAnnotation.classList.add('hidden');
+    }
+  }
+
+  function startCompareRAF() {
+    stopCompareRAF();
+    let frame = 0;
+    function loop() {
+      updateCompareTimeLabel();
+      updateTimingAnnotation();
+      frame++;
+      if (frame % 45 === 0) {
+        const drift = Math.abs(practiceVideo.currentTime - clampPracticeTime(referenceCompareVideo.currentTime));
+        if (drift > 0.15) practiceVideo.currentTime = clampPracticeTime(referenceCompareVideo.currentTime);
+      }
+      compareRafId = requestAnimationFrame(loop);
+    }
+    compareRafId = requestAnimationFrame(loop);
+  }
+
+  function stopCompareRAF() {
+    if (compareRafId) cancelAnimationFrame(compareRafId);
+    compareRafId = null;
+  }
+
+  alignReferenceBtn.addEventListener('click', () => {
+    referenceCompareVideo.pause();
+    referenceAlignTime = referenceCompareVideo.currentTime;
+    comparePlayPauseBtn.textContent = '▶';
+    stopCompareRAF();
+  });
+
+  alignPracticeBtn.addEventListener('click', () => {
+    practiceVideo.pause();
+    practiceAlignTime = practiceVideo.currentTime;
+    comparePlayPauseBtn.textContent = '▶';
+    stopCompareRAF();
+  });
+
+  clearAlignBtn.addEventListener('click', () => {
+    referenceAlignTime = 0;
+    practiceAlignTime = 0;
+  });
+
+  // Jump to a specific moment in the practice video — used by the timestamp
+  // badge on practice-feedback issue cards.
+  function seekPracticeCompareTo(time) {
+    if (!practiceCompareStage || practiceCompareStage.classList.contains('hidden')) return;
+    practiceVideo.currentTime = time;
+    referenceCompareVideo.currentTime = Math.max(0, time - getCompareOffset());
+    updateCompareTimeLabel();
+    updateTimingAnnotation();
+    practiceCompareStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // ---------- View mode / variant toggles ----------

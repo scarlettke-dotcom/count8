@@ -72,7 +72,7 @@ const OUTPUT_SCHEMA = {
 
 const SYSTEM_PROMPT_FEEDBACK = `You are a dance coach for Count8, reviewing a student's practice attempt against the reference choreography video they are learning.
 
-You will be shown two sets of still frames, each sampled in chronological order and at roughly matching points through the routine: first a set from the REFERENCE choreography video, then a set from the STUDENT'S PRACTICE video. These are still frames, not full motion, so treat any timing observation as an approximation based on body position at each sampled moment, not frame-accurate tracking.
+You will be shown two sets of still frames, each sampled in chronological order and at roughly matching points through the routine: first a set from the REFERENCE choreography video, then a set from the STUDENT'S PRACTICE video. Each practice frame is labeled with the exact timestamp (in seconds) it was captured at in the practice video. These are still frames, not full motion, so treat any timing observation as an approximation based on body position at each labeled moment, not frame-accurate tracking.
 
 Compare posture, body alignment, arm/leg extension, balance, and apparent timing between the reference and the student's practice. Identify concrete, specific issues in the student's practice — only ones you have reasonable visual evidence for across the frames. Where relevant, feedback categories include things like: weak core engagement, unstable balance, lack of arm extension, insufficient body control, and inconsistent rhythm/timing — but only report what you actually observe, don't force-fit every category.
 
@@ -86,6 +86,8 @@ Then score the practice attempt on three 0-100 scales, based only on what the fr
 Then, for each specific issue found, provide:
 - "name": a short label for the issue (e.g. "Unstable Balance on Turns")
 - "explanation": 1-2 plain-English sentences describing what you observed and why it matters
+- "timestamp_seconds": the timestamp (in seconds, a plain number) of the practice frame this issue is most closely tied to — always use one of the exact labeled timestamps you were given for the practice frames (pick whichever is most relevant even if the issue isn't purely timing-related).
+- "timing_direction": if this issue is specifically about being off-beat, set to exactly "late" (the student is behind/dragging the beat) or "early" (the student is rushing/anticipating the beat). For any non-timing issue (posture, balance, extension, etc.), set to exactly "none".
 - "youtube_queries": an array of exactly 2 specific, realistic YouTube search query strings a dancer could use to find tutorials that help fix this exact issue
 - "drill": one concrete, targeted practice drill or exercise (1-3 sentences) that isolates and improves that specific weakness
 
@@ -105,10 +107,12 @@ const OUTPUT_SCHEMA_FEEDBACK = {
         properties: {
           name: { type: 'string' },
           explanation: { type: 'string' },
+          timestamp_seconds: { type: 'number' },
+          timing_direction: { type: 'string' },
           youtube_queries: { type: 'array', items: { type: 'string' } },
           drill: { type: 'string' },
         },
-        required: ['name', 'explanation', 'youtube_queries', 'drill'],
+        required: ['name', 'explanation', 'timestamp_seconds', 'timing_direction', 'youtube_queries', 'drill'],
         additionalProperties: false,
       },
     },
@@ -232,21 +236,31 @@ function readJsonBody(req) {
   });
 }
 
+const TIMING_DIRECTIONS = new Set(['early', 'late', 'none']);
+
 // Shared by both the foundations list and the practice-feedback issues list —
-// both are the same {name, explanation, drill, youtube_queries} card shape.
+// both are the same {name, explanation, drill, youtube_queries} card shape;
+// timestamp_seconds/timing_direction only apply to (and are only sent by the
+// model for) practice-feedback issues, and are simply absent/ignored for
+// foundations items.
 function sanitizeCardItems(rawItems) {
   if (!Array.isArray(rawItems)) return [];
   return rawItems
     .filter((t) => t && typeof t.name === 'string' && t.name.trim())
     .slice(0, 8)
-    .map((t) => ({
-      name: String(t.name).slice(0, 120),
-      explanation: typeof t.explanation === 'string' ? t.explanation.slice(0, 600) : '',
-      drill: typeof t.drill === 'string' ? t.drill.slice(0, 600) : '',
-      youtube_queries: Array.isArray(t.youtube_queries)
-        ? t.youtube_queries.filter((q) => typeof q === 'string').slice(0, 2).map((q) => q.slice(0, 150))
-        : [],
-    }));
+    .map((t) => {
+      const ts = Number(t.timestamp_seconds);
+      return {
+        name: String(t.name).slice(0, 120),
+        explanation: typeof t.explanation === 'string' ? t.explanation.slice(0, 600) : '',
+        drill: typeof t.drill === 'string' ? t.drill.slice(0, 600) : '',
+        timestamp_seconds: isFinite(ts) && ts >= 0 ? ts : null,
+        timing_direction: TIMING_DIRECTIONS.has(t.timing_direction) ? t.timing_direction : 'none',
+        youtube_queries: Array.isArray(t.youtube_queries)
+          ? t.youtube_queries.filter((q) => typeof q === 'string').slice(0, 2).map((q) => q.slice(0, 150))
+          : [],
+      };
+    });
 }
 
 function sanitizeTechniques(parsed) {
@@ -430,6 +444,15 @@ async function handleAnalyzePractice(req, res) {
     sendJSON(res, 400, { error: 'Both the reference and practice video frames are required.' });
     return;
   }
+  // Optional: exact capture timestamp for each practice frame (seconds), in
+  // the same order as practiceFrames, so the model can tag each issue with
+  // a real moment in the practice video instead of a vague description.
+  const rawTimestamps = Array.isArray(body.practiceFrameTimestamps) ? body.practiceFrameTimestamps : [];
+  const practiceFrameTimestamps = practiceFrames.map((_, i) => {
+    const t = Number(rawTimestamps[i]);
+    return isFinite(t) && t >= 0 ? t : null;
+  });
+  const haveTimestamps = practiceFrameTimestamps.every((t) => t !== null);
   const lang = sanitizeLang(body.lang);
 
   let response;
@@ -451,11 +474,23 @@ async function handleAnalyzePractice(req, res) {
               type: 'image',
               source: { type: 'base64', media_type: frame.media_type, data: frame.data },
             })),
-            { type: 'text', text: "Student's practice attempt frames, in chronological order:" },
-            ...practiceFrames.map((frame) => ({
-              type: 'image',
-              source: { type: 'base64', media_type: frame.media_type, data: frame.data },
-            })),
+            {
+              type: 'text',
+              text: haveTimestamps
+                ? "Student's practice attempt frames, in chronological order. Each is immediately preceded by a text label giving its exact timestamp in the practice video:"
+                : "Student's practice attempt frames, in chronological order:",
+            },
+            ...practiceFrames.flatMap((frame, i) => {
+              const blocks = [];
+              if (haveTimestamps) {
+                blocks.push({ type: 'text', text: `Practice frame at ${practiceFrameTimestamps[i].toFixed(2)}s:` });
+              }
+              blocks.push({
+                type: 'image',
+                source: { type: 'base64', media_type: frame.media_type, data: frame.data },
+              });
+              return blocks;
+            }),
           ],
         },
       ],
