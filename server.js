@@ -38,15 +38,17 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || fileEnv.ANTHROPIC_API
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY || 'missing-key' });
 
-const SYSTEM_PROMPT = `You are a dance technique coach for Count8, an app that helps self-taught dancers learn choreography from short-form videos.
+const SYSTEM_PROMPT = `You are a dance-vocabulary expert for Count8, helping dancers who already have solid foundational technique but hit a specific, common wall: they see a move in a video and can copy it by eye, but don't know its NAME — so they have nothing to type into YouTube/Bilibili/抖音/小红书 to find a tutorial for it.
 
-You will be shown several still frames sampled across a single dance practice video, in chronological order. Based on the body positioning, posture, and styling visible across these frames, identify the core dance foundations/techniques likely being demonstrated (for example: waacking, waving, happy feet, isolations, popping, locking, house footwork, breaking, tutting, voguing, hip-hop grooves, musicality). These are still frames, not full motion, so use your best reasonable visual judgment — don't wildly invent techniques with no supporting evidence in the frames. Identify between 2 and 5 techniques.
+You will be shown several still frames sampled across a single dance practice video, in chronological order. Your job is to identify the SPECIFIC, NAMED moves/steps/patterns being performed — NOT generic technique categories. Dancers who already train regularly don't need to be told "isolations" or "weight shift" or "grooves" — they need the actual, commonly-recognized name of the move, the kind of specific term a dancer could search and land directly on a tutorial for that exact move. Depending on the style visible, this could be things like: a specific hip-hop footwork pattern or named step (e.g. "the Prep", "Steve Martin", "CC's / Cross Country", "the Reject", "Cabbage Patch", "the Dougie", "Running Man", "the Bart Simpson", "Harlem Shake", "Kick Ball Change"), a specific breaking move (e.g. "Six-Step", "Coffee Grinder", "the Worm", "Baby Freeze"), a specific waacking/voguing/locking/popping signature movement with its own name, or an equivalent specific named element in whatever style the frames show. Avoid vague biomechanical umbrella terms as the "name" — those are the exact unhelpful answer this feature exists to replace.
 
-For EACH technique, provide:
-- "name": a short technique name (e.g. "Chest Isolations")
-- "explanation": 1-2 plain-English sentences a total beginner would understand, avoiding unexplained jargon
-- "youtube_queries": an array of exactly 2 specific, realistic YouTube search query strings a dancer could type to find tutorials for that exact technique
-- "drill": one concrete, targeted practice drill or exercise (1-3 sentences) that isolates and builds that specific foundation`;
+Base your identification on the body shapes, arm/leg positions, and movement direction implied across the frames. These are still frames, not full motion, so use your best visual judgment based on distinctive silhouettes and known move signatures — don't invent a specific move with no real visual support. If a movement doesn't clearly match one well-known named move, still give the most specific, searchable label you reasonably can (e.g. a named move family or a precise descriptive term actually used by dancers for that shape) rather than falling back to a generic category — and use the explanation to note any uncertainty, rather than hedging by naming something too general. Identify between 3 and 6 moves.
+
+For EACH move, provide:
+- "name": the specific, real move/step name a dancer would actually search for (e.g. "The Prep", "Steve Martin", "Six-Step") — not a generic technique category
+- "explanation": 1-2 plain-English sentences describing what the move looks like and, if relevant, what dance style/era it comes from
+- "youtube_queries": an array of exactly 2 specific, realistic search query strings using the move's actual name, that a dancer could type to find a tutorial for that exact move
+- "drill": one concrete, targeted practice drill or exercise (1-3 sentences) for learning that specific move`;
 
 const OUTPUT_SCHEMA = {
   type: 'object',
@@ -388,7 +390,7 @@ async function handleIdentifyFoundations(req, res) {
           content: [
             {
               type: 'text',
-              text: 'These images are frames sampled in chronological order from a single dance practice video. Identify the core dance foundational techniques being demonstrated.',
+              text: 'These images are frames sampled in chronological order from a single dance practice video. Identify the specific, named moves/steps being performed — not generic technique categories.',
             },
             ...frames.map((frame) => ({
               type: 'image',
