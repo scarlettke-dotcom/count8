@@ -13,6 +13,10 @@
       nav_journal: 'Practice Journal',
       nav_advisor: 'Content Advisor',
 
+      // Hero / cover screen
+      hero_subtitle: 'Your AI Dance Coach — From Scratch to Stage',
+      hero_start_btn: 'Start Now',
+
       // Learning Mode — projects
       nav_my_projects: 'My Projects',
       projects_heading: 'Your Projects',
@@ -174,6 +178,13 @@
       advisor_project_label: 'Save results to project',
       advisor_project_none: "Don't save (standalone)",
       advisor_saved_note: 'Saved to project: {projectName}',
+      advisor_choose_project_label: 'Use a video from My Projects',
+      advisor_choose_project_placeholder: 'Select a project…',
+      advisor_or: 'or',
+      advisor_saved_videos_title: 'Previously analyzed videos',
+      advisor_video_project_tag: 'From: {projectName}',
+      advisor_remove_video: 'Remove',
+      advisor_cached_note: 'Loaded from memory — no re-upload or re-analysis needed.',
       advisor_cat_outfit: 'Outfit Styling',
       advisor_cat_camera_angle: 'Camera Angle',
       advisor_cat_camera_distance: 'Camera Distance',
@@ -187,6 +198,9 @@
       nav_learning: '学习模式',
       nav_journal: '训练日志',
       nav_advisor: '内容顾问',
+
+      hero_subtitle: '你的 AI 舞蹈教练 — 从零基础到舞台高光',
+      hero_start_btn: '立即开始',
 
       nav_my_projects: '我的项目',
       projects_heading: '你的项目',
@@ -337,6 +351,13 @@
       advisor_project_label: '将结果保存到项目',
       advisor_project_none: '不保存（独立使用）',
       advisor_saved_note: '已保存到项目：{projectName}',
+      advisor_choose_project_label: '从我的项目中选择视频',
+      advisor_choose_project_placeholder: '选择一个项目…',
+      advisor_or: '或',
+      advisor_saved_videos_title: '之前分析过的视频',
+      advisor_video_project_tag: '来自：{projectName}',
+      advisor_remove_video: '移除',
+      advisor_cached_note: '已从记忆中加载，无需重新上传或重新分析。',
       advisor_cat_outfit: '服装造型',
       advisor_cat_camera_angle: '拍摄角度',
       advisor_cat_camera_distance: '拍摄距离',

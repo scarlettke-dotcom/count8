@@ -4,6 +4,8 @@
   const { t } = window.DanceLensI18n;
 
   // ---------- DOM ----------
+  const heroScreen     = document.getElementById('heroScreen');
+  const heroStartBtn   = document.getElementById('heroStartBtn');
   const projectsScreen   = document.getElementById('projectsScreen');
   const projectsList     = document.getElementById('projectsList');
   const projectsEmpty    = document.getElementById('projectsEmpty');
@@ -203,10 +205,20 @@
     if (item) openProject(item.dataset.projectId);
   });
 
-  newProjectBtn.addEventListener('click', () => {
+  function openNewProjectModal() {
     newProjectNameInput.value = '';
     newProjectModal.classList.remove('hidden');
     newProjectNameInput.focus();
+  }
+  newProjectBtn.addEventListener('click', openNewProjectModal);
+
+  // Hero/cover screen — Start Now drops straight into project creation,
+  // which is what "the create-project interface" means here. The projects
+  // screen (with any existing projects) sits right behind it, reachable via
+  // the modal's Close button, so returning users aren't blocked from it.
+  heroStartBtn.addEventListener('click', () => {
+    heroScreen.classList.add('hidden');
+    openNewProjectModal();
   });
 
   function closeNewProjectModal() {

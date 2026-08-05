@@ -10,8 +10,15 @@
   'use strict';
 
   const DB_NAME = 'dancelens';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE = 'projects';
+  // Independent library of every video the Content Advisor has analyzed —
+  // separate from `projects` because a Content Advisor video isn't always
+  // tied to a Learning Mode project (users can analyze a standalone
+  // reference video too). Each entry remembers its own video Blob and
+  // suggestions so revisiting Content Advisor never requires re-uploading
+  // or re-analyzing something already seen.
+  const CA_STORE = 'contentAdvisorEntries';
 
   let dbPromise = null;
 
@@ -24,6 +31,9 @@
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' });
         }
+        if (!db.objectStoreNames.contains(CA_STORE)) {
+          db.createObjectStore(CA_STORE, { keyPath: 'id' });
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
@@ -31,8 +41,8 @@
     return dbPromise;
   }
 
-  function tx(mode) {
-    return openDB().then((db) => db.transaction(STORE, mode).objectStore(STORE));
+  function tx(mode, storeName) {
+    return openDB().then((db) => db.transaction(storeName || STORE, mode).objectStore(storeName || STORE));
   }
 
   function reqToPromise(req) {
@@ -44,6 +54,10 @@
 
   function genId() {
     return 'proj_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function genCaId() {
+    return 'ca_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   }
 
   function emptyProject(id, name) {
@@ -146,6 +160,73 @@
     await reqToPromise(store.delete(id));
   }
 
+  // ---------- Content Advisor video library ----------
+  // `projectId` is set when the video came from a Learning Mode project's
+  // saved original video (so re-selecting that project reuses this entry
+  // instead of re-analyzing); it's null for videos uploaded standalone
+  // directly into Content Advisor. `size` is kept alongside the video Blob
+  // so a standalone re-upload of the same file can be recognized without
+  // pulling the (potentially large) Blob out of storage just to compare.
+  function emptyContentAdvisorEntry(id, { name, projectId, video, size }) {
+    const now = Date.now();
+    return {
+      id,
+      name,
+      projectId: projectId || null,
+      size: size || (video && video.blob ? video.blob.size : 0),
+      video,                 // { blob, name, type }
+      suggestions: null,     // {...8 fields}, set once analysis completes
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  async function addContentAdvisorEntry({ name, projectId, video }) {
+    const entry = emptyContentAdvisorEntry(genCaId(), { name, projectId, video });
+    const store = await tx('readwrite', CA_STORE);
+    await reqToPromise(store.put(entry));
+    return entry;
+  }
+
+  async function getContentAdvisorEntry(id) {
+    const store = await tx('readonly', CA_STORE);
+    return reqToPromise(store.get(id));
+  }
+
+  async function updateContentAdvisorEntry(id, patch) {
+    const store = await tx('readonly', CA_STORE);
+    const entry = await reqToPromise(store.get(id));
+    if (!entry) throw new Error('Content Advisor entry not found: ' + id);
+    Object.assign(entry, patch, { updatedAt: Date.now() });
+    const writeStore = await tx('readwrite', CA_STORE);
+    await reqToPromise(writeStore.put(entry));
+    return entry;
+  }
+
+  async function deleteContentAdvisorEntry(id) {
+    const store = await tx('readwrite', CA_STORE);
+    await reqToPromise(store.delete(id));
+  }
+
+  // Lightweight listing (no blobs) for the "previously analyzed videos"
+  // picker — most-recently-used first, so the video someone is actively
+  // iterating on stays at the top.
+  async function listContentAdvisorEntriesSummary() {
+    const store = await tx('readonly', CA_STORE);
+    const all = await reqToPromise(store.getAll());
+    return all
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        projectId: e.projectId,
+        size: e.size,
+        hasSuggestions: !!e.suggestions,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
   window.DanceLensDB = {
     createProject,
     getProject,
@@ -154,5 +235,10 @@
     updateProject,
     addPracticeEntry,
     deleteProject,
+    addContentAdvisorEntry,
+    getContentAdvisorEntry,
+    updateContentAdvisorEntry,
+    deleteContentAdvisorEntry,
+    listContentAdvisorEntriesSummary,
   };
 })();

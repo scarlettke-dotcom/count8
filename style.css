@@ -1094,3 +1094,58 @@ video.css-mirrored {
   .speed-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
   .speed-btn { font-size: 0.78rem; padding: 10px 2px; }
 }
+
+/* ---------- Hero / cover screen ---------- */
+.hero-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 30% 20%, var(--accent-glow), transparent 55%),
+    radial-gradient(circle at 75% 80%, rgba(139, 92, 209, 0.25), transparent 50%),
+    var(--bg);
+  padding: 24px;
+  text-align: center;
+}
+.hero-screen.hidden { display: none; }
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 560px;
+}
+
+.hero-mark {
+  font-size: 2.8rem;
+  color: var(--accent);
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 24px var(--accent-glow));
+}
+
+.hero-title {
+  font-size: clamp(2.6rem, 8vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  background: linear-gradient(135deg, var(--text) 20%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 2.6vw, 1.3rem);
+  color: var(--text-dim);
+  margin: 0 0 36px;
+  line-height: 1.5;
+}
+
+.hero-start-btn {
+  font-size: 1.05rem;
+  padding: 14px 42px;
+  border-radius: 999px;
+}

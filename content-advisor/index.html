@@ -36,20 +36,38 @@
   <!-- Upload -->
   <section id="uploadSection" class="card upload-card">
     <div class="project-picker-row">
+      <label for="projectVideoPicker" data-i18n="advisor_choose_project_label">Use a video from My Projects</label>
+      <select id="projectVideoPicker">
+        <option value="" data-i18n="advisor_choose_project_placeholder">Select a project…</option>
+      </select>
+    </div>
+
+    <div class="modal-divider" data-i18n="advisor_or">or</div>
+
+    <button id="chooseFileBtn" class="btn btn-primary" data-i18n="advisor_upload_btn">Upload Reference Video</button>
+    <input id="fileInput" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" hidden />
+    <p id="uploadError" class="error-text hidden"></p>
+
+    <div id="savedVideosSection" class="saved-videos-section hidden">
+      <p class="saved-videos-title" data-i18n="advisor_saved_videos_title">Previously analyzed videos</p>
+      <div id="savedVideosList" class="saved-videos-list"></div>
+    </div>
+
+    <div class="modal-divider"></div>
+
+    <div class="project-picker-row">
       <label for="projectPicker" data-i18n="advisor_project_label">Save results to project</label>
       <select id="projectPicker">
         <option value="" data-i18n="advisor_project_none">Don't save (standalone)</option>
       </select>
     </div>
-    <button id="chooseFileBtn" class="btn btn-primary" data-i18n="advisor_upload_btn">Upload Reference Video</button>
-    <input id="fileInput" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" hidden />
-    <p id="uploadError" class="error-text hidden"></p>
   </section>
 
   <!-- Reference video preview -->
   <section id="videoPreviewSection" class="card video-preview-card hidden">
     <span class="pane-label" data-i18n="advisor_pane_label">Reference Video</span>
     <video id="referenceVideo" playsinline controls></video>
+    <p id="advisorCachedNote" class="advisor-cached-note hidden" data-i18n="advisor_cached_note">Loaded from memory — no re-upload or re-analysis needed.</p>
   </section>
 
   <!-- Analysis status -->

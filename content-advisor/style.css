@@ -142,6 +142,100 @@ main {
   margin: -8px 0 16px;
 }
 
+.advisor-cached-note {
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 10px 14px 14px;
+}
+
+.modal-divider {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0;
+  position: relative;
+  width: 100%;
+}
+.modal-divider:not(:empty)::before,
+.modal-divider:not(:empty)::after {
+  content: "";
+  display: inline-block;
+  width: 30%;
+  height: 1px;
+  background: var(--border);
+  vertical-align: middle;
+  margin: 0 8px;
+}
+.modal-divider:empty { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* Previously analyzed videos */
+.saved-videos-section {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.saved-videos-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+.saved-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-video-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-raised-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.saved-video-item:hover { border-color: var(--accent-dim); }
+.saved-video-item.active { border-color: var(--accent); background: rgba(192, 132, 252, 0.08); }
+
+.saved-video-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-video-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-video-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.saved-video-remove {
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  min-height: unset;
+  flex-shrink: 0;
+}
+.saved-video-remove:hover { color: var(--danger); background: rgba(255, 107, 107, 0.12); }
+
 /* Reference video preview */
 .video-preview-card { padding: 0; overflow: hidden; }
 
