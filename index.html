@@ -20,6 +20,22 @@
     <button id="heroStartBtn" class="btn btn-primary hero-start-btn" data-i18n="hero_start_btn">Start Now</button>
   </div>
 </div>
+<script>
+  // Show the cover only once per browser session — "Learning Mode" is a
+  // plain link (full page reload), so without this it would reappear on
+  // every navigation back to "/", not just on the visitor's first arrival.
+  // Runs synchronously, immediately after the element, so there's no flash
+  // of the hero screen before this hides it on repeat visits.
+  (function () {
+    try {
+      if (sessionStorage.getItem('count8_hero_seen') === '1') {
+        document.getElementById('heroScreen').classList.add('hidden');
+      } else {
+        sessionStorage.setItem('count8_hero_seen', '1');
+      }
+    } catch (e) { /* sessionStorage unavailable — just show it every time */ }
+  })();
+</script>
 
 <div class="app-shell">
   <aside class="site-sidebar">
@@ -173,6 +189,10 @@
         </div>
 
         <section id="foundationsSection" class="foundations-section hidden">
+          <div id="foundationsLangNotice" class="lang-mismatch-notice hidden">
+            <span id="foundationsLangNoticeText"></span>
+            <button id="foundationsRegenerateBtn" class="btn btn-ghost btn-small"></button>
+          </div>
           <div id="foundationsCards" class="cards-container"></div>
         </section>
       </aside>
@@ -237,6 +257,10 @@
           </div>
         </div>
         <p id="practiceFeedbackSummary" class="practice-feedback-summary"></p>
+        <div id="practiceFeedbackLangNotice" class="lang-mismatch-notice hidden">
+          <span id="practiceFeedbackLangNoticeText"></span>
+          <button id="practiceFeedbackRegenerateBtn" class="btn btn-ghost btn-small"></button>
+        </div>
         <div id="practiceFeedbackCards" class="cards-container"></div>
       </section>
     </section>

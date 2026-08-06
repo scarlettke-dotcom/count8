@@ -1149,3 +1149,27 @@ video.css-mirrored {
   padding: 14px 42px;
   border-radius: 999px;
 }
+
+/* ---------- Language-mismatch notice (AI content generated in a
+   different language than the current UI) ---------- */
+.lang-mismatch-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--bg-raised-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.btn-small {
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  min-height: unset;
+  flex-shrink: 0;
+}

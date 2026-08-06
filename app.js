@@ -34,6 +34,9 @@
   const foundationsStatusText = document.getElementById('foundationsStatusText');
   const foundationsSection    = document.getElementById('foundationsSection');
   const foundationsCards      = document.getElementById('foundationsCards');
+  const foundationsLangNotice     = document.getElementById('foundationsLangNotice');
+  const foundationsLangNoticeText = document.getElementById('foundationsLangNoticeText');
+  const foundationsRegenerateBtn  = document.getElementById('foundationsRegenerateBtn');
 
   const choosePracticeFileBtn = document.getElementById('choosePracticeFileBtn');
   const practiceFileInput     = document.getElementById('practiceFileInput');
@@ -56,6 +59,9 @@
   const practiceFeedbackResults    = document.getElementById('practiceFeedbackResults');
   const practiceFeedbackSummary    = document.getElementById('practiceFeedbackSummary');
   const practiceFeedbackCards      = document.getElementById('practiceFeedbackCards');
+  const practiceFeedbackLangNotice     = document.getElementById('practiceFeedbackLangNotice');
+  const practiceFeedbackLangNoticeText = document.getElementById('practiceFeedbackLangNoticeText');
+  const practiceFeedbackRegenerateBtn  = document.getElementById('practiceFeedbackRegenerateBtn');
   const scoreAccuracy  = document.getElementById('scoreAccuracy');
   const scoreTiming    = document.getElementById('scoreTiming');
   const scoreStability = document.getElementById('scoreStability');
@@ -119,6 +125,17 @@
   let practiceAlignTime = 0;    // seconds, paused position marked in the practice video
   let compareRafId = null;
   let lastPracticeIssues = [];  // most recent practice feedback issues, for the timing overlay
+
+  // Dynamically-built cards (foundations/practice-feedback) only render their
+  // t()-driven labels once, at creation time — switching the UI language
+  // live doesn't touch them the way data-i18n elements do. These track what's
+  // currently on screen so a language change can re-render them, and what
+  // language the underlying AI content itself was generated in (which a
+  // re-render can't fix — that needs a real regenerate).
+  let lastFoundationsData = null;
+  let lastFoundationsLang = null;
+  let lastPracticeFeedbackData = null;
+  let lastPracticeFeedbackLang = null;
 
   let bpmSet = false;
   let bpmValue = 120;
@@ -262,6 +279,9 @@
     foundationsStatus.classList.add('hidden');
     foundationsSection.classList.add('hidden');
     foundationsCards.innerHTML = '';
+    foundationsLangNotice.classList.add('hidden');
+    lastFoundationsData = null;
+    lastFoundationsLang = null;
 
     if (practiceURL) { URL.revokeObjectURL(practiceURL); practiceURL = null; }
     currentPracticeFile = null;
@@ -272,6 +292,9 @@
     practiceFeedbackStatus.classList.add('hidden');
     practiceFeedbackResults.classList.add('hidden');
     practiceFeedbackCards.innerHTML = '';
+    practiceFeedbackLangNotice.classList.add('hidden');
+    lastPracticeFeedbackData = null;
+    lastPracticeFeedbackLang = null;
     practiceUploadError.classList.add('hidden');
     practiceFileInput.value = '';
 
@@ -318,7 +341,10 @@
       renderBookmarks();
 
       if (Array.isArray(project.foundations) && project.foundations.length) {
+        lastFoundationsData = project.foundations;
+        lastFoundationsLang = project.foundationsLang || null;
         renderFoundations(project.foundations);
+        updateFoundationsLangNotice();
       } else {
         attemptIdentifyFoundations();
       }
@@ -333,7 +359,10 @@
         practiceCompareStage.classList.remove('hidden');
         referenceCompareVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(referenceCompareVideo), { once: true });
         practiceVideo.addEventListener('loadedmetadata', () => ensureFiniteDuration(practiceVideo), { once: true });
+        lastPracticeFeedbackData = latest.feedback;
+        lastPracticeFeedbackLang = latest.feedback && latest.feedback.lang || null;
         renderPracticeFeedback(latest.feedback);
+        updatePracticeFeedbackLangNotice();
       }
     }, { once: true });
 
@@ -681,6 +710,7 @@
   async function attemptIdentifyFoundations() {
     foundationsSection.classList.add('hidden');
     foundationsCards.innerHTML = '';
+    foundationsLangNotice.classList.add('hidden');
     foundationsStatus.classList.remove('hidden');
     foundationsStatusText.textContent = t('foundations_status_identifying');
 
@@ -694,11 +724,12 @@
       return;
     }
 
+    const lang = window.DanceLensI18n.getLang();
     try {
       const res = await fetch('/api/identify-foundations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frames: frames.map((f) => f.dataUrl), lang: window.DanceLensI18n.getLang() }),
+        body: JSON.stringify({ frames: frames.map((f) => f.dataUrl), lang }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -709,12 +740,18 @@
         throw new Error('No techniques were identified in this video.');
       }
 
+      lastFoundationsData = data.techniques;
+      lastFoundationsLang = lang;
       renderFoundations(data.techniques);
+      updateFoundationsLangNotice();
       foundationsStatus.classList.add('hidden');
 
       if (currentProjectId) {
         try {
-          currentProject = await window.DanceLensDB.updateProject(currentProjectId, { foundations: data.techniques });
+          currentProject = await window.DanceLensDB.updateProject(currentProjectId, {
+            foundations: data.techniques,
+            foundationsLang: lang,
+          });
         } catch (e) {
           console.warn('Could not save foundations to this project.', e);
         }
@@ -726,6 +763,27 @@
       foundationsStatusText.textContent = err.message || "Couldn't identify techniques for this video.";
     }
   }
+
+  // ---------- Language-mismatch notices ----------
+  // Two supported languages only — a tiny lookup beats round-tripping
+  // through the i18n system just to name "the other language".
+  function langDisplayName(code, uiLang) {
+    if (uiLang === 'zh') return code === 'zh' ? '中文' : '英文';
+    return code === 'zh' ? 'Chinese' : 'English';
+  }
+
+  function updateFoundationsLangNotice() {
+    const uiLang = window.DanceLensI18n.getLang();
+    const mismatched = lastFoundationsLang && lastFoundationsData && lastFoundationsLang !== uiLang;
+    foundationsLangNotice.classList.toggle('hidden', !mismatched);
+    if (!mismatched) return;
+    foundationsLangNoticeText.textContent = t('lang_mismatch_note', { lang: langDisplayName(lastFoundationsLang, uiLang) });
+    foundationsRegenerateBtn.textContent = t('lang_mismatch_regenerate_btn', { lang: langDisplayName(uiLang, uiLang) });
+  }
+
+  foundationsRegenerateBtn.addEventListener('click', () => {
+    if (originalURL) attemptIdentifyFoundations();
+  });
 
   const SEARCH_PLATFORMS = [
     { id: 'youtube', label: 'YouTube', urlFor: (q) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q) },
@@ -915,6 +973,7 @@
   async function attemptAnalyzePractice() {
     practiceFeedbackResults.classList.add('hidden');
     practiceFeedbackCards.innerHTML = '';
+    practiceFeedbackLangNotice.classList.add('hidden');
     practiceFeedbackStatus.classList.remove('hidden');
     practiceFeedbackStatusText.textContent = t('practice_status_analyzing');
 
@@ -932,6 +991,7 @@
       return;
     }
 
+    const lang = window.DanceLensI18n.getLang();
     try {
       const res = await fetch('/api/analyze-practice', {
         method: 'POST',
@@ -940,7 +1000,7 @@
           referenceFrames: referenceFrames.map((f) => f.dataUrl),
           practiceFrames: practiceFrames.map((f) => f.dataUrl),
           practiceFrameTimestamps: practiceFrames.map((f) => f.time),
-          lang: window.DanceLensI18n.getLang(),
+          lang,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -951,8 +1011,12 @@
       if (!data.issues || !data.issues.length) {
         throw new Error('No feedback was identified for this practice video.');
       }
+      data.lang = lang;
 
+      lastPracticeFeedbackData = data;
+      lastPracticeFeedbackLang = lang;
       renderPracticeFeedback(data);
+      updatePracticeFeedbackLangNotice();
       practiceFeedbackStatus.classList.add('hidden');
 
       if (currentProjectId && currentPracticeFile) {
@@ -972,6 +1036,19 @@
       practiceFeedbackStatusText.textContent = err.message || "Couldn't analyze this practice video.";
     }
   }
+
+  function updatePracticeFeedbackLangNotice() {
+    const uiLang = window.DanceLensI18n.getLang();
+    const mismatched = lastPracticeFeedbackLang && lastPracticeFeedbackData && lastPracticeFeedbackLang !== uiLang;
+    practiceFeedbackLangNotice.classList.toggle('hidden', !mismatched);
+    if (!mismatched) return;
+    practiceFeedbackLangNoticeText.textContent = t('lang_mismatch_note', { lang: langDisplayName(lastPracticeFeedbackLang, uiLang) });
+    practiceFeedbackRegenerateBtn.textContent = t('lang_mismatch_regenerate_btn', { lang: langDisplayName(uiLang, uiLang) });
+  }
+
+  practiceFeedbackRegenerateBtn.addEventListener('click', () => {
+    if (originalURL && practiceURL) attemptAnalyzePractice();
+  });
 
   function renderScoreBadge(el, value) {
     el.textContent = (typeof value === 'number' && isFinite(value)) ? Math.round(value) + '%' : '—';
@@ -1662,5 +1739,18 @@
 
   window.DanceLensI18n.onChange(() => {
     if (!projectsScreen.classList.contains('hidden')) renderProjectsList();
+
+    // Static [data-i18n] elements update themselves automatically, but
+    // dynamically-built cards only set their t()-driven labels once, at
+    // creation time — re-render whatever's currently on screen so section
+    // headings inside them ("Drill to Practice", etc.) catch up too.
+    if (lastFoundationsData) {
+      renderFoundations(lastFoundationsData);
+      updateFoundationsLangNotice();
+    }
+    if (lastPracticeFeedbackData) {
+      renderPracticeFeedback(lastPracticeFeedbackData);
+      updatePracticeFeedbackLangNotice();
+    }
   });
 })();

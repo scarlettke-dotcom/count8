@@ -17,6 +17,11 @@
       hero_subtitle: 'Your AI Dance Coach — From Scratch to Stage',
       hero_start_btn: 'Start Now',
 
+      // Language-mismatch notice (AI content generated in a different
+      // language than the one currently active)
+      lang_mismatch_note: 'This was generated in {lang}.',
+      lang_mismatch_regenerate_btn: 'Regenerate in {lang}',
+
       // Learning Mode — projects
       nav_my_projects: 'My Projects',
       projects_heading: 'Your Projects',
@@ -201,6 +206,9 @@
 
       hero_subtitle: '你的 AI 舞蹈教练 — 从零基础到舞台高光',
       hero_start_btn: '立即开始',
+
+      lang_mismatch_note: '此内容是用{lang}生成的。',
+      lang_mismatch_regenerate_btn: '用{lang}重新生成',
 
       nav_my_projects: '我的项目',
       projects_heading: '你的项目',
