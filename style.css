@@ -593,6 +593,10 @@ video.css-mirrored {
   transform: translate(-50%, -50%) scale(1.25);
 }
 
+.bookmark-marker.loop-anchor {
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 .seek-bar::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
@@ -1172,4 +1176,14 @@ video.css-mirrored {
   font-size: 0.82rem;
   min-height: unset;
   flex-shrink: 0;
+}
+
+#loopBtn.active {
+  background: var(--accent);
+  color: #1a0d29;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.bookmark-hint {
+  margin-top: -6px;
 }

@@ -162,8 +162,10 @@
             <div class="seek-bookmarks" id="seekBookmarks"></div>
           </div>
           <span id="timeLabel" class="time-label">0:00 / 0:00</span>
+          <button id="loopBtn" class="btn btn-icon" aria-label="Loop this section" title="Loop this section" disabled>🔁</button>
           <button id="fullscreenBtn" class="btn btn-icon" aria-label="Theater mode">⛶</button>
         </div>
+        <p class="hint-text bookmark-hint" data-i18n="bookmark_loop_hint">Double-click (or long-press) the seek bar to drop a marker, then tap 🔁 to loop that section.</p>
 
         <!-- Speed controls -->
         <div class="speed-section">
@@ -306,6 +308,16 @@
       <button id="tapTempoBtn" class="btn btn-accent btn-tap" data-i18n="bpm_tap_btn">TAP</button>
       <p class="tap-readout"><span data-i18n="bpm_detected">Detected:</span> <span id="tapBpmReadout">—</span> <span data-i18n="bpm_unit">BPM</span></p>
       <button id="useTapBpmBtn" class="btn btn-secondary" disabled data-i18n="bpm_use_this">Use this BPM</button>
+    </div>
+
+    <div class="modal-divider" data-i18n="bpm_or">or</div>
+
+    <div class="modal-section">
+      <label data-i18n="bpm_auto_label">Auto-detect from audio</label>
+      <button id="autoDetectBpmBtn" class="btn btn-accent" data-i18n="bpm_auto_btn">Auto-Detect</button>
+      <p class="tap-readout"><span data-i18n="bpm_detected">Detected:</span> <span id="autoBpmReadout">—</span> <span data-i18n="bpm_unit">BPM</span></p>
+      <button id="useAutoBpmBtn" class="btn btn-secondary" disabled data-i18n="bpm_use_this">Use this BPM</button>
+      <p class="hint-text" data-i18n="bpm_auto_hint">Best-effort estimate from the video's audio track — double-check it against the music before relying on it.</p>
     </div>
 
     <div class="modal-divider"></div>

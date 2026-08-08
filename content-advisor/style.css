@@ -96,6 +96,21 @@ main {
 }
 .btn-primary:hover { background: #cd9dfd; }
 
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--accent-dim); }
+
+.btn-small {
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  min-height: unset;
+}
+
+.retry-btn { margin-top: 10px; }
+
 .error-text {
   color: var(--danger);
   font-size: 0.85rem;

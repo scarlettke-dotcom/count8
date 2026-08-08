@@ -100,6 +100,34 @@
     { key: 'video_framing',           icon: '🎬', labelKey: 'advisor_cat_framing' },
   ];
 
+  // ---------- Network helpers ----------
+  const ANALYSIS_TIMEOUT_MS = 75000;
+
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || ANALYSIS_TIMEOUT_MS);
+    try {
+      return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error(t('analysis_timeout_error'));
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function renderRetryableError(statusTextEl, message, retryFn) {
+    statusTextEl.textContent = message;
+    const existing = statusTextEl.parentNode.querySelector('.retry-btn');
+    if (existing) existing.remove();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost btn-small retry-btn';
+    btn.textContent = t('retry_btn');
+    btn.addEventListener('click', retryFn);
+    statusTextEl.parentNode.appendChild(btn);
+  }
+
   // ---------- Upload ----------
   function isValidVideoFile(file) {
     if (!file) return false;
@@ -330,6 +358,8 @@
     advisorCachedNote.classList.add('hidden');
     advisorStatus.classList.remove('hidden');
     advisorStatusText.textContent = t('advisor_status_analyzing');
+    const oldRetryBtn = advisorStatus.querySelector('.retry-btn');
+    if (oldRetryBtn) oldRetryBtn.remove();
 
     let frames;
     try {
@@ -337,12 +367,12 @@
       if (!frames.length) throw new Error('No frames captured');
     } catch (err) {
       console.warn('Frame extraction failed.', err);
-      advisorStatusText.textContent = t('advisor_status_no_frames');
+      renderRetryableError(advisorStatusText, t('advisor_status_no_frames'), () => runAnalysisForEntry(entryId));
       return;
     }
 
     try {
-      const res = await fetch('/api/analyze-content-style', {
+      const res = await fetchWithTimeout('/api/analyze-content-style', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ frames, lang: window.DanceLensI18n.getLang() }),
@@ -384,7 +414,11 @@
       }
     } catch (err) {
       console.warn('Content style analysis failed.', err);
-      advisorStatusText.textContent = err.message || "Couldn't analyze this video.";
+      renderRetryableError(
+        advisorStatusText,
+        err.message || "Couldn't analyze this video.",
+        () => runAnalysisForEntry(entryId)
+      );
     }
   }
 

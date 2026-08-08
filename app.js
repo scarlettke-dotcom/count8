@@ -87,6 +87,7 @@
   const seekBar       = document.getElementById('seekBar');
   const seekBookmarksEl = document.getElementById('seekBookmarks');
   const timeLabel     = document.getElementById('timeLabel');
+  const loopBtn       = document.getElementById('loopBtn');
   const fullscreenBtn = document.getElementById('fullscreenBtn');
   const speedButtons  = document.getElementById('speedButtons');
 
@@ -100,6 +101,9 @@
   const closeBpmModalBtn = document.getElementById('closeBpmModalBtn');
   const clearBpmBtn      = document.getElementById('clearBpmBtn');
   const voiceCountToggle = document.getElementById('voiceCountToggle');
+  const autoDetectBpmBtn = document.getElementById('autoDetectBpmBtn');
+  const autoBpmReadout   = document.getElementById('autoBpmReadout');
+  const useAutoBpmBtn    = document.getElementById('useAutoBpmBtn');
 
   const SPEEDS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
   const BEATS_PER_COUNT = 8;
@@ -119,6 +123,8 @@
   let isSeeking = false;
   let rafId = null;
   let bookmarks = [];   // [{ id, time }] for the currently open project
+  let loopActive = false;
+  let loopBookmarkId = null;  // which bookmark is the current loop's start point
 
   // ---------- Practice compare-stage sync state ----------
   let referenceAlignTime = 0;   // seconds, paused position marked in the reference video
@@ -147,6 +153,7 @@
   let voiceCountEnabled = false;
   try { voiceCountEnabled = window.localStorage.getItem('count8_voice_count') === '1'; } catch (e) { /* ignore */ }
   let detectedTapBpm = null;
+  let detectedAutoBpm = null;
 
   videoMirrored.classList.add('css-mirrored');
 
@@ -299,6 +306,8 @@
     practiceFileInput.value = '';
 
     bookmarks = [];
+    loopActive = false;
+    loopBookmarkId = null;
     renderBookmarks();
 
     fileInput.value = '';
@@ -367,6 +376,43 @@
     }, { once: true });
 
     videoOriginal.addEventListener('durationchange', updateSeekBarMax);
+  }
+
+  // ---------- Network helpers ----------
+  // Without this, a stalled request to the Claude API (common without a
+  // working route to it — e.g. mainland China without a proxy) just left
+  // the "Analyzing…" spinner running forever with no way out except
+  // reloading the whole page. Aborts after ANALYSIS_TIMEOUT_MS with a
+  // clear, distinct message instead.
+  const ANALYSIS_TIMEOUT_MS = 75000;
+
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || ANALYSIS_TIMEOUT_MS);
+    try {
+      return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error(t('analysis_timeout_error'));
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Appends a small inline "Retry" button after an error message inside a
+  // status element, so a failed analysis can be retried in place instead of
+  // forcing the user to re-pick the file (which sometimes doesn't even
+  // re-fire the file input's change event for an unchanged selection).
+  function renderRetryableError(statusTextEl, message, retryFn) {
+    statusTextEl.textContent = message;
+    const existing = statusTextEl.parentNode.querySelector('.retry-btn');
+    if (existing) existing.remove();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost btn-small retry-btn';
+    btn.textContent = t('retry_btn');
+    btn.addEventListener('click', retryFn);
+    statusTextEl.parentNode.appendChild(btn);
   }
 
   // ---------- Upload ----------
@@ -713,6 +759,8 @@
     foundationsLangNotice.classList.add('hidden');
     foundationsStatus.classList.remove('hidden');
     foundationsStatusText.textContent = t('foundations_status_identifying');
+    const oldRetryBtn = foundationsStatus.querySelector('.retry-btn');
+    if (oldRetryBtn) oldRetryBtn.remove();
 
     let frames;
     try {
@@ -720,13 +768,13 @@
       if (!frames.length) throw new Error('No frames captured');
     } catch (err) {
       console.warn('Frame extraction failed.', err);
-      foundationsStatusText.textContent = t('foundations_status_no_frames');
+      renderRetryableError(foundationsStatusText, t('foundations_status_no_frames'), attemptIdentifyFoundations);
       return;
     }
 
     const lang = window.DanceLensI18n.getLang();
     try {
-      const res = await fetch('/api/identify-foundations', {
+      const res = await fetchWithTimeout('/api/identify-foundations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ frames: frames.map((f) => f.dataUrl), lang }),
@@ -760,7 +808,11 @@
       // Surface the real reason (e.g. a missing/invalid OpenAI API key) instead
       // of a generic message — this is the actionable info the user needs.
       console.warn('Foundational technique identification failed.', err);
-      foundationsStatusText.textContent = err.message || "Couldn't identify techniques for this video.";
+      renderRetryableError(
+        foundationsStatusText,
+        err.message || "Couldn't identify techniques for this video.",
+        attemptIdentifyFoundations
+      );
     }
   }
 
@@ -789,7 +841,11 @@
     { id: 'youtube', label: 'YouTube', urlFor: (q) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q) },
     { id: 'bilibili', label: 'B站', urlFor: (q) => 'https://search.bilibili.com/all?keyword=' + encodeURIComponent(q) },
     { id: 'douyin', label: '抖音', urlFor: (q) => 'https://www.douyin.com/search/' + encodeURIComponent(q) },
-    { id: 'xiaohongshu', label: '小红书', urlFor: (q) => 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(q) },
+    // Xiaohongshu's own web search puts a login wall in front of results
+    // for anonymous visitors — confirmed directly, it's not a broken link
+    // on our end, just their platform's restriction. Flagging it so the
+    // link itself explains the (real, occasionally confusing) behavior.
+    { id: 'xiaohongshu', label: '小红书', requiresLogin: true, urlFor: (q) => 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(q) },
   ];
 
   function buildQueryRow(query) {
@@ -811,6 +867,7 @@
       link.href = platform.urlFor(query);
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
+      if (platform.requiresLogin) link.title = t('search_login_required_hint');
 
       const dot = document.createElement('span');
       dot.className = 'platform-dot';
@@ -976,6 +1033,8 @@
     practiceFeedbackLangNotice.classList.add('hidden');
     practiceFeedbackStatus.classList.remove('hidden');
     practiceFeedbackStatusText.textContent = t('practice_status_analyzing');
+    const oldRetryBtn = practiceFeedbackStatus.querySelector('.retry-btn');
+    if (oldRetryBtn) oldRetryBtn.remove();
 
     let referenceFrames;
     let practiceFrames;
@@ -987,13 +1046,13 @@
       if (!referenceFrames.length || !practiceFrames.length) throw new Error('No frames captured');
     } catch (err) {
       console.warn('Frame extraction failed.', err);
-      practiceFeedbackStatusText.textContent = t('practice_status_no_frames');
+      renderRetryableError(practiceFeedbackStatusText, t('practice_status_no_frames'), attemptAnalyzePractice);
       return;
     }
 
     const lang = window.DanceLensI18n.getLang();
     try {
-      const res = await fetch('/api/analyze-practice', {
+      const res = await fetchWithTimeout('/api/analyze-practice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1033,7 +1092,11 @@
       // Same principle as the foundations feature: surface the real reason
       // (e.g. a missing API key or low credit balance) instead of a vague message.
       console.warn('Practice feedback analysis failed.', err);
-      practiceFeedbackStatusText.textContent = err.message || "Couldn't analyze this practice video.";
+      renderRetryableError(
+        practiceFeedbackStatusText,
+        err.message || "Couldn't analyze this practice video.",
+        attemptAnalyzePractice
+      );
     }
   }
 
@@ -1456,6 +1519,75 @@
     updateBeatOverlay();
   }
 
+  // ---------- Loop playback (repeat a bookmarked section) ----------
+  // Jumping to a bookmark also marks it as the loop anchor, so 🔁 has an
+  // obvious, immediate target — "the section starting at wherever I just
+  // jumped to" — rather than requiring a separate selection step.
+  function jumpToBookmark(bookmark) {
+    seekToTime(bookmark.time);
+    loopBookmarkId = bookmark.id;
+    updateLoopBtnState();
+    renderBookmarks(); // refresh which marker shows the loop-anchor ring
+  }
+
+  // A "section" is the span from this bookmark to the next one chronologically
+  // (matches how people actually use two bookmarks to mark a hard part), or a
+  // fixed 4s window if there's no next bookmark to bound it.
+  function getLoopWindow() {
+    const idx = bookmarks.findIndex((b) => b.id === loopBookmarkId);
+    if (idx === -1) return null;
+    const start = bookmarks[idx].time;
+    const next = bookmarks[idx + 1];
+    const dur = videoOriginal.duration || start + 4;
+    const end = next ? Math.min(next.time, dur) : Math.min(start + 4, dur);
+    if (end <= start) return null;
+    return { start, end };
+  }
+
+  function updateLoopBtnState() {
+    loopBtn.disabled = bookmarks.length === 0;
+    loopBtn.classList.toggle('active', loopActive);
+    loopBtn.title = loopActive ? t('loop_btn_on') : t('loop_btn_label');
+    loopBtn.setAttribute('aria-label', loopBtn.title);
+  }
+
+  loopBtn.addEventListener('click', () => {
+    if (bookmarks.length === 0) return;
+    if (!loopActive) {
+      // No bookmark explicitly jumped to yet this session — default to
+      // whichever bookmark the playhead has most recently passed, so
+      // pressing 🔁 "just works" from wherever playback currently is.
+      if (!bookmarks.some((b) => b.id === loopBookmarkId)) {
+        const cur = videoOriginal.currentTime || 0;
+        const passed = bookmarks.filter((b) => b.time <= cur);
+        loopBookmarkId = (passed.length ? passed[passed.length - 1] : bookmarks[0]).id;
+      }
+      loopActive = true;
+      seekToTime(bookmarks.find((b) => b.id === loopBookmarkId).time);
+    } else {
+      loopActive = false;
+    }
+    updateLoopBtnState();
+  });
+
+  // Called every RAF tick while the main player is playing — see startRAF().
+  function checkLoopBoundary() {
+    if (!loopActive) return;
+    const win = getLoopWindow();
+    if (!win) { loopActive = false; updateLoopBtnState(); return; }
+    if (getActiveVideoEl().currentTime >= win.end) {
+      seekToTime(win.start);
+    }
+  }
+
+  // Also check on the video element's own 'timeupdate' (fires a few times a
+  // second, driven by actual media playback) rather than relying solely on
+  // requestAnimationFrame — RAF is heavily throttled or paused for
+  // backgrounded/hidden tabs while media playback keeps running at normal
+  // speed, so RAF-only would miss the loop boundary if the tab isn't in the
+  // foreground the whole time.
+  videoOriginal.addEventListener('timeupdate', checkLoopBoundary);
+
   function timeFromClientX(clientX) {
     const rect = seekBar.getBoundingClientRect();
     const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
@@ -1481,6 +1613,10 @@
 
   function removeBookmark(id) {
     bookmarks = bookmarks.filter((b) => b.id !== id);
+    if (loopBookmarkId === id) {
+      loopActive = false;
+      loopBookmarkId = null;
+    }
     renderBookmarks();
     persistBookmarks();
   }
@@ -1488,13 +1624,14 @@
   function buildBookmarkMarker(bookmark) {
     const el = document.createElement('div');
     el.className = 'bookmark-marker';
+    if (bookmark.id === loopBookmarkId) el.classList.add('loop-anchor');
     const dur = videoOriginal.duration || 1;
     el.style.left = Math.min(100, Math.max(0, (bookmark.time / dur) * 100)) + '%';
     el.title = formatTime(bookmark.time);
 
     el.addEventListener('click', (e) => {
       e.stopPropagation();
-      seekToTime(bookmark.time);
+      jumpToBookmark(bookmark);
     });
     el.addEventListener('dblclick', (e) => {
       e.stopPropagation();
@@ -1515,7 +1652,12 @@
       if (markerPressTimer) {
         clearTimeout(markerPressTimer);
         markerPressTimer = null;
-        seekToTime(bookmark.time);
+        // Suppress the synthetic ~300ms-later click event touch browsers
+        // fire after touchend — without this, a tap on a marker triggered
+        // jumpToBookmark twice back-to-back (harmless in effect, but it
+        // meant every touch interaction here silently double-fired).
+        e.preventDefault();
+        jumpToBookmark(bookmark);
       }
     });
     el.addEventListener('touchmove', (e) => { e.stopPropagation(); });
@@ -1526,6 +1668,7 @@
   function renderBookmarks() {
     seekBookmarksEl.innerHTML = '';
     bookmarks.forEach((b) => seekBookmarksEl.appendChild(buildBookmarkMarker(b)));
+    updateLoopBtnState();
   }
 
   seekBar.addEventListener('dblclick', (e) => {
@@ -1582,6 +1725,7 @@
     function loop() {
       updateTimeLabel();
       updateBeatOverlay();
+      checkLoopBoundary();
       frame++;
       if (frame % 45 === 0) correctDrift();
       rafId = requestAnimationFrame(loop);
@@ -1655,6 +1799,10 @@
     detectedTapBpm = null;
     tapBpmReadout.textContent = '—';
     useTapBpmBtn.disabled = true;
+    detectedAutoBpm = null;
+    autoBpmReadout.textContent = '—';
+    useAutoBpmBtn.disabled = true;
+    autoDetectBpmBtn.disabled = !originalURL;
     voiceCountToggle.checked = voiceCountEnabled;
     voiceCountToggle.disabled = !canSpeak;
   }
@@ -1697,6 +1845,107 @@
   useTapBpmBtn.addEventListener('click', () => {
     if (detectedTapBpm) {
       activateBpm(detectedTapBpm);
+      closeBpmModal();
+    }
+  });
+
+  // ---------- Auto-detect BPM from the video's audio ----------
+  // Not an LLM/Claude call — Claude's API doesn't analyze raw audio for
+  // tempo. This is real client-side signal processing via the Web Audio
+  // API: decode the audio track, build an energy-based onset-strength
+  // envelope, and autocorrelate it to find the dominant beat period. Like
+  // any beat detector (including professional ones), it can occasionally
+  // lock onto a half/double-tempo octave error, so the result is offered
+  // for confirmation rather than applied automatically.
+  const AUTO_BPM_MIN = 60;
+  const AUTO_BPM_MAX = 200;
+  const AUTO_BPM_MAX_ANALYZE_SECONDS = 60;
+
+  async function detectBpmFromVideo(sourceURL) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) throw new Error(t('bpm_auto_unsupported'));
+
+    const res = await fetch(sourceURL);
+    const arrayBuffer = await res.arrayBuffer();
+
+    const audioCtx = new AudioCtx();
+    let audioBuffer;
+    try {
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+      throw new Error(t('bpm_auto_no_audio'));
+    } finally {
+      audioCtx.close();
+    }
+
+    const sampleRate = audioBuffer.sampleRate;
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleCount = Math.min(channelData.length, sampleRate * AUTO_BPM_MAX_ANALYZE_SECONDS);
+    if (sampleCount < sampleRate * 2) throw new Error(t('bpm_auto_no_audio'));
+
+    // 10ms energy blocks — fine enough to resolve tempos up to 200 BPM,
+    // coarse enough that autocorrelation over it is effectively instant.
+    const hopSize = Math.round(sampleRate * 0.01);
+    const numHops = Math.floor(sampleCount / hopSize);
+    const energy = new Float32Array(numHops);
+    for (let i = 0; i < numHops; i++) {
+      const start = i * hopSize;
+      const end = Math.min(start + hopSize, sampleCount);
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += channelData[j] * channelData[j];
+      energy[i] = Math.sqrt(sum / (end - start));
+    }
+
+    // Onset-strength envelope: positive half-wave-rectified energy
+    // increases. Beats/kicks show up as sharp jumps in energy; sustained
+    // or fading sound doesn't, so this emphasizes the rhythmic attacks.
+    const onset = new Float32Array(numHops);
+    let onsetTotal = 0;
+    for (let i = 1; i < numHops; i++) {
+      const diff = energy[i] - energy[i - 1];
+      onset[i] = diff > 0 ? diff : 0;
+      onsetTotal += onset[i];
+    }
+    if (onsetTotal < 1e-6) throw new Error(t('bpm_auto_no_beat'));
+
+    const hopTime = hopSize / sampleRate;
+    const minLag = Math.max(1, Math.round((60 / AUTO_BPM_MAX) / hopTime));
+    const maxLag = Math.min(numHops - 1, Math.round((60 / AUTO_BPM_MIN) / hopTime));
+
+    let bestLag = -1;
+    let bestScore = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let sum = 0;
+      for (let i = 0; i + lag < numHops; i++) sum += onset[i] * onset[i + lag];
+      if (sum > bestScore) { bestScore = sum; bestLag = lag; }
+    }
+    if (bestLag <= 0) throw new Error(t('bpm_auto_no_beat'));
+
+    const bpm = 60 / (bestLag * hopTime);
+    return Math.round(bpm);
+  }
+
+  autoDetectBpmBtn.addEventListener('click', async () => {
+    if (!originalURL) return;
+    autoDetectBpmBtn.disabled = true;
+    useAutoBpmBtn.disabled = true;
+    autoBpmReadout.textContent = t('bpm_auto_detecting');
+    try {
+      detectedAutoBpm = await detectBpmFromVideo(originalURL);
+      autoBpmReadout.textContent = String(detectedAutoBpm);
+      useAutoBpmBtn.disabled = false;
+    } catch (err) {
+      console.warn('BPM auto-detect failed.', err);
+      detectedAutoBpm = null;
+      autoBpmReadout.textContent = err.message || t('bpm_auto_failed');
+    } finally {
+      autoDetectBpmBtn.disabled = false;
+    }
+  });
+
+  useAutoBpmBtn.addEventListener('click', () => {
+    if (detectedAutoBpm) {
+      activateBpm(detectedAutoBpm);
       closeBpmModal();
     }
   });

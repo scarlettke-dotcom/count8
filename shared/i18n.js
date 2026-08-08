@@ -9,6 +9,10 @@
 
   const TRANSLATIONS = {
     en: {
+      analysis_timeout_error: 'This is taking too long and timed out — the connection to the AI service may be slow or blocked. Try again, or use a VPN if you\'re on a restricted network.',
+      retry_btn: 'Retry',
+      search_login_required_hint: 'This platform may require logging in to view search results.',
+
       nav_learning: 'Learning Mode',
       nav_journal: 'Practice Journal',
       nav_advisor: 'Content Advisor',
@@ -102,6 +106,10 @@
 
       speed_title: 'Playback Speed',
 
+      bookmark_loop_hint: 'Double-click (or long-press) the seek bar to drop a marker, then tap 🔁 to loop that section.',
+      loop_btn_label: 'Loop this section',
+      loop_btn_on: 'Looping ✓',
+
       // Identified moves
       foundations_title: 'Identified Moves',
       foundations_status_identifying: 'Identifying moves…',
@@ -142,6 +150,14 @@
       bpm_turn_off: 'Turn off beat overlay',
       bpm_voice_count_label: 'Voice count-out',
       bpm_voice_count_hint: 'Speaks each count (1-8) out loud as the beat overlay ticks, using your device\'s text-to-speech.',
+      bpm_auto_label: 'Auto-detect from audio',
+      bpm_auto_btn: 'Auto-Detect',
+      bpm_auto_hint: 'Best-effort estimate from the video\'s audio track — double-check it against the music before relying on it.',
+      bpm_auto_detecting: 'Detecting…',
+      bpm_auto_no_audio: 'No usable audio track found in this video.',
+      bpm_auto_no_beat: "Couldn't detect a clear beat — try tap tempo or manual entry instead.",
+      bpm_auto_unsupported: 'Audio analysis isn\'t supported in this browser.',
+      bpm_auto_failed: 'Could not analyze this video\'s audio.',
 
       // Practice Journal
       journal_log_title: 'Log a Practice Session',
@@ -200,6 +216,10 @@
       advisor_cat_framing: 'Video Framing',
     },
     zh: {
+      analysis_timeout_error: '请求超时了 —— 到 AI 服务的连接可能比较慢或者被限制了。请重试，如果你的网络访问受限，也可以尝试使用 VPN。',
+      retry_btn: '重试',
+      search_login_required_hint: '该平台的搜索结果可能需要登录才能查看。',
+
       nav_learning: '学习模式',
       nav_journal: '训练日志',
       nav_advisor: '内容顾问',
@@ -282,6 +302,10 @@
 
       speed_title: '播放速度',
 
+      bookmark_loop_hint: '双击（或长按）进度条添加节点，然后点击 🔁 循环播放该片段。',
+      loop_btn_label: '循环播放该片段',
+      loop_btn_on: '循环中 ✓',
+
       foundations_title: '招式识别',
       foundations_status_identifying: '正在识别招式…',
       foundations_status_no_frames: '无法读取该视频进行分析，请换一个文件试试。',
@@ -319,6 +343,14 @@
       bpm_turn_off: '关闭节拍显示',
       bpm_voice_count_label: '语音喊拍',
       bpm_voice_count_hint: '节拍跳动时，用你设备的语音朗读功能喊出每个拍数（1-8）。',
+      bpm_auto_label: '从音频自动识别',
+      bpm_auto_btn: '自动识别',
+      bpm_auto_hint: '这是根据视频音轨估算的结果，请对照音乐核实一下再使用。',
+      bpm_auto_detecting: '识别中…',
+      bpm_auto_no_audio: '这个视频里没有可用的音轨。',
+      bpm_auto_no_beat: '没能识别出明显的节拍，请改用点按测速或手动输入。',
+      bpm_auto_unsupported: '当前浏览器不支持音频分析。',
+      bpm_auto_failed: '无法分析这个视频的音频。',
 
       journal_log_title: '记录一次练习',
       journal_date_label: '日期',
