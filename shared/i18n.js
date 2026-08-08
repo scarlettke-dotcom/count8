@@ -109,6 +109,11 @@
       bookmark_loop_hint: 'Double-click (or long-press) the seek bar to drop a marker, then tap 🔁 to loop that section.',
       loop_btn_label: 'Loop this section',
       loop_btn_on: 'Looping ✓',
+      bookmarks_panel_title: 'Marked Moments',
+      bookmark_note_placeholder: 'Add a note…',
+      bookmark_jump_btn: 'Jump here',
+      bookmark_loop_this_btn: 'Loop',
+      bookmark_delete_btn: 'Delete',
 
       // Identified moves
       foundations_title: 'Identified Moves',
@@ -116,6 +121,10 @@
       foundations_status_no_frames: "Couldn't read this video to analyze it. Try a different file.",
       tech_drill_title: 'Drill to Practice',
       tech_tutorials_title: 'Find Tutorials',
+      tech_edit_btn: 'Edit name',
+      tech_delete_btn: 'Remove',
+      tech_delete_confirm: 'Remove this from the list? You can regenerate the full list later if you change your mind.',
+      custom_search_placeholder: 'Search your own term…',
 
       // Practice feedback
       practice_feedback_title: 'Practice Feedback',
@@ -305,12 +314,21 @@
       bookmark_loop_hint: '双击（或长按）进度条添加节点，然后点击 🔁 循环播放该片段。',
       loop_btn_label: '循环播放该片段',
       loop_btn_on: '循环中 ✓',
+      bookmarks_panel_title: '标记的片段',
+      bookmark_note_placeholder: '添加笔记…',
+      bookmark_jump_btn: '跳转',
+      bookmark_loop_this_btn: '循环',
+      bookmark_delete_btn: '删除',
 
       foundations_title: '招式识别',
       foundations_status_identifying: '正在识别招式…',
       foundations_status_no_frames: '无法读取该视频进行分析，请换一个文件试试。',
       tech_drill_title: '练习动作',
       tech_tutorials_title: '查找教程',
+      tech_edit_btn: '编辑名称',
+      tech_delete_btn: '移除',
+      tech_delete_confirm: '要把这一项从列表中移除吗？如果之后改变主意，可以重新生成完整列表。',
+      custom_search_placeholder: '输入你自己的搜索词…',
 
       practice_feedback_title: '练习反馈',
       practice_feedback_intro: '上传一段你练习这套编舞的视频，获取关于节奏、姿态和技巧的个性化反馈。',

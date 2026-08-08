@@ -167,6 +167,14 @@
         </div>
         <p class="hint-text bookmark-hint" data-i18n="bookmark_loop_hint">Double-click (or long-press) the seek bar to drop a marker, then tap 🔁 to loop that section.</p>
 
+        <!-- Bookmarks panel: a frame preview + editable note for every marker,
+             so you can see what's there before jumping (no more "blind spot"
+             clicking) and jot down what to remember about that moment. -->
+        <div id="bookmarksPanel" class="bookmarks-panel hidden">
+          <h2 class="section-title" data-i18n="bookmarks_panel_title">Marked Moments</h2>
+          <div id="bookmarksList" class="bookmarks-list"></div>
+        </div>
+
         <!-- Speed controls -->
         <div class="speed-section">
           <h2 class="section-title" data-i18n="speed_title">Playback Speed</h2>

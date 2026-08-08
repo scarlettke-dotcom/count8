@@ -86,6 +86,8 @@
   const seekBarWrap   = document.getElementById('seekBarWrap');
   const seekBar       = document.getElementById('seekBar');
   const seekBookmarksEl = document.getElementById('seekBookmarks');
+  const bookmarksPanel  = document.getElementById('bookmarksPanel');
+  const bookmarksList   = document.getElementById('bookmarksList');
   const timeLabel     = document.getElementById('timeLabel');
   const loopBtn       = document.getElementById('loopBtn');
   const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -142,6 +144,7 @@
   let lastFoundationsLang = null;
   let lastPracticeFeedbackData = null;
   let lastPracticeFeedbackLang = null;
+  let lastPracticeFrames = [];  // [{dataUrl, time}] — shown inline on each issue card
 
   let bpmSet = false;
   let bpmValue = 120;
@@ -753,6 +756,57 @@
     });
   }
 
+  // Single-frame version of extractFrames — used for bookmark thumbnails,
+  // where we need one small preview image at an arbitrary, caller-chosen
+  // time rather than several frames spread across the whole clip.
+  function captureFrameAt(sourceURL, time) {
+    return new Promise((resolve, reject) => {
+      const offVideo = document.createElement('video');
+      offVideo.src = sourceURL;
+      offVideo.muted = true;
+      offVideo.playsInline = true;
+      offVideo.style.position = 'fixed';
+      offVideo.style.left = '-99999px';
+      document.body.appendChild(offVideo);
+
+      const cleanup = () => {
+        if (offVideo.parentNode) offVideo.parentNode.removeChild(offVideo);
+      };
+
+      offVideo.addEventListener('loadedmetadata', () => {
+        const duration = offVideo.duration;
+        if (!isFinite(duration) || duration <= 0) {
+          cleanup();
+          reject(new Error('Could not read video duration'));
+          return;
+        }
+        const maxWidth = 240;
+        const srcWidth = offVideo.videoWidth || maxWidth;
+        const srcHeight = offVideo.videoHeight || Math.round(maxWidth * 1.5);
+        const scale = Math.min(1, maxWidth / srcWidth);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(srcWidth * scale));
+        canvas.height = Math.max(1, Math.round(srcHeight * scale));
+        const ctx = canvas.getContext('2d');
+
+        const onSeeked = () => {
+          offVideo.removeEventListener('seeked', onSeeked);
+          ctx.drawImage(offVideo, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
+          cleanup();
+          resolve(dataUrl);
+        };
+        offVideo.addEventListener('seeked', onSeeked);
+        offVideo.currentTime = Math.min(Math.max(0, time), Math.max(0, duration - 0.05));
+      }, { once: true });
+
+      offVideo.addEventListener('error', () => {
+        cleanup();
+        reject(new Error('Failed to load video'));
+      }, { once: true });
+    });
+  }
+
   async function attemptIdentifyFoundations() {
     foundationsSection.classList.add('hidden');
     foundationsCards.innerHTML = '';
@@ -884,7 +938,60 @@
     return row;
   }
 
-  function buildFoundationCard(technique, index) {
+  // Lets the user type their own search term instead of relying only on
+  // the AI's suggested queries — the platform links read whatever's
+  // currently typed at the moment they're clicked.
+  function buildCustomSearchRow() {
+    const row = document.createElement('div');
+    row.className = 'yt-query-row yt-custom-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'yt-custom-input';
+    input.placeholder = t('custom_search_placeholder');
+    input.maxLength = 150;
+    row.appendChild(input);
+
+    const linksWrap = document.createElement('div');
+    linksWrap.className = 'yt-platform-links';
+
+    SEARCH_PLATFORMS.forEach((platform) => {
+      const link = document.createElement('a');
+      link.className = 'yt-platform-link';
+      link.dataset.platform = platform.id;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      if (platform.requiresLogin) link.title = t('search_login_required_hint');
+
+      const dot = document.createElement('span');
+      dot.className = 'platform-dot';
+      const label = document.createElement('span');
+      label.textContent = platform.label;
+      link.appendChild(dot);
+      link.appendChild(label);
+
+      link.addEventListener('click', (e) => {
+        const q = input.value.trim();
+        if (!q) { e.preventDefault(); input.focus(); return; }
+        link.href = platform.urlFor(q);
+      });
+      linksWrap.appendChild(link);
+    });
+
+    row.appendChild(linksWrap);
+    return row;
+  }
+
+  // options:
+  //   frames    — [{dataUrl, time}] to show the actual practice-video frame
+  //               closest to technique.timestamp_seconds (practice issues only)
+  //   editable  — show rename/delete controls (Identified Moves only, where
+  //               the AI can misidentify a move and the user should be able
+  //               to fix it without re-running the whole analysis)
+  //   onRename  — (newName) => void
+  //   onDelete  — () => void
+  function buildFoundationCard(technique, index, options) {
+    options = options || {};
     const card = document.createElement('div');
     card.className = 'tech-card' + (index === 0 ? ' expanded' : '');
 
@@ -933,10 +1040,95 @@
     chevron.textContent = '▾';
 
     header.appendChild(nameWrap);
-    header.appendChild(chevron);
+
+    const headerActions = document.createElement('span');
+    headerActions.className = 'tech-header-actions';
+
+    // Rename/delete controls for lists where the AI can be wrong and
+    // there's no cheap way to fix just one entry other than editing it
+    // directly (regenerating the whole list costs an API call and can
+    // still get other entries wrong).
+    if (options.editable) {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'tech-action-btn';
+      editBtn.textContent = '✏️';
+      editBtn.title = t('tech_edit_btn');
+      editBtn.setAttribute('aria-label', t('tech_edit_btn'));
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startRenaming();
+      });
+      headerActions.appendChild(editBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'tech-action-btn';
+      deleteBtn.textContent = '🗑️';
+      deleteBtn.title = t('tech_delete_btn');
+      deleteBtn.setAttribute('aria-label', t('tech_delete_btn'));
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.confirm(t('tech_delete_confirm'))) options.onDelete && options.onDelete();
+      });
+      headerActions.appendChild(deleteBtn);
+    }
+
+    headerActions.appendChild(chevron);
+    header.appendChild(headerActions);
+
+    function startRenaming() {
+      if (nameWrap.querySelector('.tech-name-edit-input')) return; // already editing
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'tech-name-edit-input';
+      input.value = technique.name;
+      input.maxLength = 120;
+      const finish = (commit) => {
+        if (commit) {
+          const val = input.value.trim();
+          if (val && val !== technique.name) {
+            technique.name = val;
+            nameText.textContent = val;
+            options.onRename && options.onRename(val);
+          }
+        }
+        input.replaceWith(nameText);
+      };
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Escape') finish(false);
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('blur', () => finish(true));
+      nameText.replaceWith(input);
+      input.focus();
+      input.select();
+    }
 
     const body = document.createElement('div');
     body.className = 'tech-card-body' + (index === 0 ? '' : ' hidden');
+
+    // The actual practice-video frame at this issue's moment — seeing it
+    // directly (not just a text description) is much faster to act on than
+    // reading "you were rushing the chorus" and having to go find it yourself.
+    if (Array.isArray(options.frames) && options.frames.length && typeof technique.timestamp_seconds === 'number') {
+      let nearest = options.frames[0];
+      let bestDiff = Math.abs(nearest.time - technique.timestamp_seconds);
+      for (const f of options.frames) {
+        const diff = Math.abs(f.time - technique.timestamp_seconds);
+        if (diff < bestDiff) { nearest = f; bestDiff = diff; }
+      }
+      if (nearest && nearest.dataUrl) {
+        const frameImg = document.createElement('img');
+        frameImg.className = 'tech-frame-img';
+        frameImg.src = nearest.dataUrl;
+        frameImg.alt = formatTime(technique.timestamp_seconds);
+        frameImg.addEventListener('click', () => seekPracticeCompareTo(technique.timestamp_seconds));
+        body.appendChild(frameImg);
+      }
+    }
 
     if (technique.explanation) {
       const explanation = document.createElement('p');
@@ -968,6 +1160,7 @@
       technique.youtube_queries.forEach((query) => {
         linksWrap.appendChild(buildQueryRow(query));
       });
+      linksWrap.appendChild(buildCustomSearchRow());
 
       ytSection.appendChild(h4);
       ytSection.appendChild(linksWrap);
@@ -986,12 +1179,29 @@
     return card;
   }
 
+  async function persistFoundationsEdit() {
+    if (!currentProjectId) return;
+    try {
+      currentProject = await window.DanceLensDB.updateProject(currentProjectId, { foundations: lastFoundationsData });
+    } catch (e) {
+      console.warn('Could not save move list changes.', e);
+    }
+  }
+
   function renderFoundations(techniques) {
     foundationsCards.innerHTML = '';
     techniques.forEach((technique, index) => {
-      foundationsCards.appendChild(buildFoundationCard(technique, index));
+      foundationsCards.appendChild(buildFoundationCard(technique, index, {
+        editable: true,
+        onRename: () => persistFoundationsEdit(),
+        onDelete: () => {
+          lastFoundationsData = lastFoundationsData.filter((item) => item !== technique);
+          persistFoundationsEdit();
+          renderFoundations(lastFoundationsData);
+        },
+      }));
     });
-    foundationsSection.classList.remove('hidden');
+    foundationsSection.classList.toggle('hidden', techniques.length === 0);
   }
 
   // ---------- Practice feedback (compare a self-recorded attempt) ----------
@@ -1071,6 +1281,10 @@
         throw new Error('No feedback was identified for this practice video.');
       }
       data.lang = lang;
+      // Keep the frames alongside the feedback so a re-render (language
+      // switch, reopening the project) can still show the actual video
+      // frame for each issue, not just the text.
+      data.frames = practiceFrames.map((f) => ({ dataUrl: f.dataUrl, time: f.time }));
 
       lastPracticeFeedbackData = data;
       lastPracticeFeedbackLang = lang;
@@ -1124,8 +1338,9 @@
     practiceFeedbackSummary.textContent = data.summary || '';
     practiceFeedbackSummary.classList.toggle('hidden', !data.summary);
     practiceFeedbackCards.innerHTML = '';
+    lastPracticeFrames = Array.isArray(data.frames) ? data.frames : [];
     data.issues.forEach((issue, index) => {
-      practiceFeedbackCards.appendChild(buildFoundationCard(issue, index));
+      practiceFeedbackCards.appendChild(buildFoundationCard(issue, index, { frames: lastPracticeFrames }));
     });
     practiceFeedbackResults.classList.remove('hidden');
 
@@ -1603,12 +1818,30 @@
     }
   }
 
-  function addBookmark(time) {
+  async function addBookmark(time) {
     if (!isFinite(time) || !videoOriginal.duration) return;
-    bookmarks.push({ id: 'bm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), time });
+    const bookmark = {
+      id: 'bm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      time,
+      note: '',
+      thumbnail: null,
+    };
+    // Show the marker immediately, don't make the user wait on the
+    // thumbnail capture — fill it in and re-render once it's ready.
+    bookmarks.push(bookmark);
     bookmarks.sort((a, b) => a.time - b.time);
     renderBookmarks();
     persistBookmarks();
+
+    if (originalURL) {
+      try {
+        bookmark.thumbnail = await captureFrameAt(originalURL, time);
+        renderBookmarks();
+        persistBookmarks();
+      } catch (e) {
+        console.warn('Could not capture a thumbnail for this marker.', e);
+      }
+    }
   }
 
   function removeBookmark(id) {
@@ -1621,13 +1854,31 @@
     persistBookmarks();
   }
 
+  function updateBookmarkNote(id, note) {
+    const bookmark = bookmarks.find((b) => b.id === id);
+    if (!bookmark) return;
+    bookmark.note = note;
+    persistBookmarks();
+  }
+
+  // Used by both the tiny seek-bar dot and the panel's loop button — jumping
+  // to a bookmark always makes it the loop anchor (see jumpToBookmark), but
+  // the panel also needs a way to loop a bookmark without first seeking away
+  // from wherever the user currently is.
+  function setLoopAnchor(id) {
+    loopBookmarkId = id;
+    loopActive = true;
+    updateLoopBtnState();
+    renderBookmarks();
+  }
+
   function buildBookmarkMarker(bookmark) {
     const el = document.createElement('div');
     el.className = 'bookmark-marker';
     if (bookmark.id === loopBookmarkId) el.classList.add('loop-anchor');
     const dur = videoOriginal.duration || 1;
     el.style.left = Math.min(100, Math.max(0, (bookmark.time / dur) * 100)) + '%';
-    el.title = formatTime(bookmark.time);
+    el.title = bookmark.note ? formatTime(bookmark.time) + ' — ' + bookmark.note : formatTime(bookmark.time);
 
     el.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1665,10 +1916,83 @@
     return el;
   }
 
+  // The panel is the reliable "see before you jump" surface — it shows every
+  // marker's frame + note at a glance, which works the same on touch and
+  // desktop (a hover tooltip on an 11px dot doesn't really work on mobile).
+  function buildBookmarkRow(bookmark) {
+    const row = document.createElement('div');
+    row.className = 'bookmark-row';
+    if (bookmark.id === loopBookmarkId) row.classList.add('loop-anchor');
+
+    // An empty img.src is a footgun (some browsers re-request the current
+    // document), so use a plain placeholder div until the thumbnail —
+    // captured asynchronously — is actually ready.
+    let thumb;
+    if (bookmark.thumbnail) {
+      thumb = document.createElement('img');
+      thumb.className = 'bookmark-thumb';
+      thumb.alt = formatTime(bookmark.time);
+      thumb.src = bookmark.thumbnail;
+    } else {
+      thumb = document.createElement('div');
+      thumb.className = 'bookmark-thumb bookmark-thumb-placeholder';
+      thumb.textContent = '🎬';
+    }
+    thumb.addEventListener('click', () => jumpToBookmark(bookmark));
+    row.appendChild(thumb);
+
+    const main = document.createElement('div');
+    main.className = 'bookmark-row-main';
+
+    const timeBadge = document.createElement('span');
+    timeBadge.className = 'bookmark-time-badge';
+    timeBadge.textContent = formatTime(bookmark.time);
+    timeBadge.addEventListener('click', () => jumpToBookmark(bookmark));
+    main.appendChild(timeBadge);
+
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.className = 'bookmark-note-input';
+    noteInput.placeholder = t('bookmark_note_placeholder');
+    noteInput.value = bookmark.note || '';
+    noteInput.maxLength = 200;
+    noteInput.addEventListener('change', () => updateBookmarkNote(bookmark.id, noteInput.value));
+    main.appendChild(noteInput);
+
+    row.appendChild(main);
+
+    const actions = document.createElement('div');
+    actions.className = 'bookmark-row-actions';
+
+    const loopThisBtn = document.createElement('button');
+    loopThisBtn.type = 'button';
+    loopThisBtn.className = 'bookmark-action-btn';
+    if (bookmark.id === loopBookmarkId && loopActive) loopThisBtn.classList.add('active');
+    loopThisBtn.textContent = '🔁';
+    loopThisBtn.title = t('bookmark_loop_this_btn');
+    loopThisBtn.addEventListener('click', () => setLoopAnchor(bookmark.id));
+    actions.appendChild(loopThisBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'bookmark-action-btn';
+    deleteBtn.textContent = '🗑';
+    deleteBtn.title = t('bookmark_delete_btn');
+    deleteBtn.addEventListener('click', () => removeBookmark(bookmark.id));
+    actions.appendChild(deleteBtn);
+
+    row.appendChild(actions);
+    return row;
+  }
+
   function renderBookmarks() {
     seekBookmarksEl.innerHTML = '';
     bookmarks.forEach((b) => seekBookmarksEl.appendChild(buildBookmarkMarker(b)));
     updateLoopBtnState();
+
+    bookmarksPanel.classList.toggle('hidden', bookmarks.length === 0);
+    bookmarksList.innerHTML = '';
+    bookmarks.forEach((b) => bookmarksList.appendChild(buildBookmarkRow(b)));
   }
 
   seekBar.addEventListener('dblclick', (e) => {
